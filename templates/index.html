@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>MySellComb Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="layout">
+        <aside class="log-panel">
+            <div class="panel-header">
+                <h2>Request Logs</h2>
+                <span class="panel-subtitle">HTTP traffic, crawl state, and auto-save results</span>
+            </div>
+            <div id="logConsole" class="log-console"></div>
+        </aside>
+
+        <main class="dashboard-panel">
+            <div class="top-bar">
+                <div>
+                    <h1>MySellComb Dashboard</h1>
+                    <p class="subtitle">Run TikTok search crawling, inspect results, and monitor Google Sheet saves.</p>
+                </div>
+            </div>
+
+            <section class="control-card">
+                <div class="control-row two-columns">
+                    <div class="input-group">
+                        <label for="intervalSelect">Repeat interval</label>
+                        <select id="intervalSelect">
+                            <option value="60">1 minute</option>
+                            <option value="300">5 minutes</option>
+                            <option value="600">10 minutes</option>
+                            <option value="1800">30 minutes</option>
+                            <option value="3600" selected>1 hour</option>
+                            <option value="21600">6 hours</option>
+                            <option value="43200">12 hours</option>
+                            <option value="86400">24 hours</option>
+                        </select>
+                    </div>
+
+                    <div id="tiktokControls" class="tiktok-config hidden">
+                        <div class="input-group">
+                            <label for="tiktokKeyword">TikTok keyword</label>
+                            <input id="tiktokKeyword" type="text" placeholder="e.g. camping gear">
+                        </div>
+                        <div class="input-group">
+                            <label for="tiktokLimit">Top video count</label>
+                            <input id="tiktokLimit" type="number" min="1" max="30" value="10">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="source-button-row">
+                    <button id="sourceBtnCoupang" class="source-btn active" onclick="selectSource('coupang')">Coupang</button>
+                    <button id="sourceBtnNaver" class="source-btn" onclick="selectSource('naver')">Naver</button>
+                    <button id="sourceBtnTiktok" class="source-btn" onclick="selectSource('tiktok')">TikTok</button>
+                </div>
+
+                <div class="control-box">
+                    <button class="action-btn primary" onclick="startCrawl()">Start repeat crawl</button>
+                    <button class="action-btn danger" onclick="stopCrawl()">Stop repeat crawl</button>
+                    <button class="action-btn secondary" onclick="runSelectedFetch()">Run fetch now</button>
+                    <button class="action-btn neutral" onclick="checkHealth()">Health check</button>
+                </div>
+
+                <div id="crawlStatus" class="status-box stopped">Waiting for a request.</div>
+                <div id="resultInfo" class="result-info">Select a source to begin.</div>
+            </section>
+
+            <section class="table-panel">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Source</th>
+                            <th>Name</th>
+                            <th>Views / Price</th>
+                            <th>Link</th>
+                            <th>Comments / Reviews</th>
+                            <th>Likes / Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productTableBody">
+                        <tr>
+                            <td colspan="6" class="empty-row">No crawl result yet.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        let selectedSource = "coupang";
+
+        function selectSource(source) {
+            selectedSource = source;
+
+            const ids = [
+                ["sourceBtnCoupang", "coupang"],
+                ["sourceBtnNaver", "naver"],
+                ["sourceBtnTiktok", "tiktok"]
+            ];
+
+            for (const [id, value] of ids) {
+                const button = document.getElementById(id);
+                button.classList.toggle("active", value === source);
+            }
+
+            document.getElementById("tiktokControls").classList.toggle("hidden", source !== "tiktok");
+            document.getElementById("resultInfo").textContent =
+                source === "tiktok"
+                    ? "TikTok auto mode selected. Enter a keyword and a top-N limit."
+                    : `Selected source: ${source}`;
+        }
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return "";
+            return String(value)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function renderProducts(source, products) {
+            const tbody = document.getElementById("productTableBody");
+            tbody.innerHTML = "";
+
+            if (!products || products.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="empty-row">No products or videos returned.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            for (const product of products) {
+                const row = document.createElement("tr");
+                const linkHtml = product.link
+                    ? `<a href="${escapeHtml(product.link)}" target="_blank" rel="noreferrer">Open</a>`
+                    : "";
+
+                row.innerHTML = `
+                    <td>${escapeHtml(source)}</td>
+                    <td>${escapeHtml(product.name)}</td>
+                    <td>${escapeHtml(product.view_count || product.price || "")}</td>
+                    <td>${linkHtml}</td>
+                    <td>${escapeHtml(product.comment_count || product.review || "")}</td>
+                    <td>${escapeHtml(product.like_count || product.rating || "")}</td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        async function runFetch(source) {
+            const resultInfo = document.getElementById("resultInfo");
+            resultInfo.textContent = `${source} fetch in progress...`;
+
+            try {
+                const response = await fetch(`/fetch?source=${encodeURIComponent(source)}`);
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    resultInfo.textContent = `Error: ${data.error || "fetch failed"}`;
+                    return;
+                }
+
+                resultInfo.textContent = `${data.source} fetch completed / ${data.count} items`;
+                renderProducts(data.source, data.products);
+                await loadLogs();
+                await loadCrawlStatus();
+            } catch (error) {
+                resultInfo.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function runTiktokAutoFetch() {
+            const keyword = document.getElementById("tiktokKeyword").value.trim();
+            const limit = Number(document.getElementById("tiktokLimit").value || 10);
+            const resultInfo = document.getElementById("resultInfo");
+
+            if (!keyword) {
+                resultInfo.textContent = "TikTok keyword is required.";
+                return;
+            }
+
+            resultInfo.textContent = `TikTok auto fetch in progress / keyword=${keyword} / top=${limit}`;
+
+            try {
+                const response = await fetch("/fetch/tiktok/auto", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keyword, limit })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    const blockedSuffix = data.save_error ? ` / save_error=${data.save_error}` : "";
+                    resultInfo.textContent = `Error: ${data.error || "TikTok auto fetch failed"}${blockedSuffix}`;
+                    renderProducts("tiktok", data.products || []);
+                    await loadLogs();
+                    await loadCrawlStatus();
+                    return;
+                }
+
+                const saveSuffix = data.save_error ? ` / save_error=${data.save_error}` : "";
+                resultInfo.textContent =
+                    `TikTok auto fetch completed / keyword=${data.keyword} / discovered=${data.discovered_count} / saved=${data.saved_count}${saveSuffix}`;
+                renderProducts("tiktok", data.products);
+                await loadLogs();
+                await loadCrawlStatus();
+            } catch (error) {
+                resultInfo.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function runSelectedFetch() {
+            if (selectedSource === "tiktok") {
+                return runTiktokAutoFetch();
+            }
+            return runFetch(selectedSource);
+        }
+
+        async function startCrawl(force = false) {
+            const intervalSeconds = Number(document.getElementById("intervalSelect").value);
+            const resultInfo = document.getElementById("resultInfo");
+
+            if (selectedSource === "tiktok") {
+                resultInfo.textContent = "TikTok repeat crawl is not enabled. Use 'Run fetch now' with keyword input.";
+                return;
+            }
+
+            resultInfo.textContent = `${selectedSource} repeat crawl start requested...`;
+
+            try {
+                const response = await fetch("/crawl/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        source: selectedSource,
+                        interval_seconds: intervalSeconds,
+                        force
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.status === 409 && data.require_confirm) {
+                    const ok = confirm(
+                        `${data.message}\nLast run: ${data.last_completed_at || "-"}\nLast count: ${data.last_result_count ?? 0}\nContinue?`
+                    );
+                    if (ok) {
+                        return startCrawl(true);
+                    }
+                    resultInfo.textContent = "Repeat crawl start canceled.";
+                    return;
+                }
+
+                if (!response.ok || !data.success) {
+                    resultInfo.textContent = `Error: ${data.error || "repeat crawl failed to start"}`;
+                    return;
+                }
+
+                resultInfo.textContent = data.message;
+                await loadLogs();
+                await loadCrawlStatus();
+            } catch (error) {
+                resultInfo.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function stopCrawl() {
+            const resultInfo = document.getElementById("resultInfo");
+            resultInfo.textContent = "Repeat crawl stop requested...";
+
+            try {
+                const response = await fetch("/crawl/stop", { method: "POST" });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    resultInfo.textContent = `Error: ${data.error || "stop failed"}`;
+                    return;
+                }
+
+                resultInfo.textContent = data.message;
+                await loadLogs();
+                await loadCrawlStatus();
+            } catch (error) {
+                resultInfo.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function checkHealth() {
+            const resultInfo = document.getElementById("resultInfo");
+
+            try {
+                const response = await fetch("/health");
+                const data = await response.json();
+                resultInfo.textContent = `Health: ${data.status} / sources = ${data.available_sources.join(", ")}`;
+                await loadLogs();
+                await loadCrawlStatus();
+            } catch (error) {
+                resultInfo.textContent = `Health check failed: ${error.message}`;
+            }
+        }
+
+        function getLogClass(line) {
+            if (line.includes("[ERROR]")) return "log-line error";
+            if (line.includes("[NOTICE]")) return "log-line notice";
+            return "log-line";
+        }
+
+        async function loadLogs() {
+            try {
+                const response = await fetch("/logs");
+                const data = await response.json();
+                if (!data.success) return;
+
+                const logConsole = document.getElementById("logConsole");
+                logConsole.innerHTML = "";
+
+                const logs = data.logs || [];
+                if (logs.length === 0) {
+                    logConsole.textContent = "No logs yet.";
+                    return;
+                }
+
+                for (const line of logs) {
+                    const div = document.createElement("div");
+                    div.className = getLogClass(line);
+                    div.textContent = line;
+                    logConsole.appendChild(div);
+                }
+
+                logConsole.scrollTop = logConsole.scrollHeight;
+            } catch (error) {
+                console.error("Failed to load logs:", error);
+            }
+        }
+
+        async function loadCrawlStatus() {
+            try {
+                const response = await fetch("/crawl/status");
+                const data = await response.json();
+                if (!data.success) return;
+
+                const statusBox = document.getElementById("crawlStatus");
+
+                if (data.is_running) {
+                    statusBox.textContent =
+                        `Running / source=${data.source} / interval=${data.interval_seconds}s / started=${data.last_started_at || "-"}`;
+                    statusBox.className = "status-box running";
+                    return;
+                }
+
+                const tiktokDetails = (data.last_details || {}).tiktok || {};
+                const tiktokError = (data.last_error || {}).tiktok || "";
+                const tiktokSummary = tiktokDetails.keyword
+                    ? ` / tiktok keyword=${tiktokDetails.keyword} discovered=${tiktokDetails.discovered_count ?? 0} saved=${tiktokDetails.saved_count ?? 0}`
+                    : "";
+                const errorSummary = tiktokError ? ` / last_error=${tiktokError}` : "";
+
+                statusBox.textContent =
+                    `Idle / last_stopped=${data.last_stopped_at || "-"} / last_result=${JSON.stringify(data.last_result_count || {})}${tiktokSummary}${errorSummary}`;
+                statusBox.className = "status-box stopped";
+            } catch (error) {
+                console.error("Failed to load crawl status:", error);
+            }
+        }
+
+        selectSource("coupang");
+        loadLogs();
+        loadCrawlStatus();
+        setInterval(loadLogs, 2000);
+        setInterval(loadCrawlStatus, 2000);
+    </script>
+</body>
+</html>
