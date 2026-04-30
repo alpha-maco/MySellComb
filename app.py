@@ -22,6 +22,10 @@ DASHBOARD_URL = "http://127.0.0.1:5000/"
 
 HTTP_LOGS = []
 MAX_LOGS = 300
+POLLING_LOG_PATHS = {
+    "/logs",
+    "/crawl/status",
+}
 
 CRAWL_STATE = {
     "is_running": False,
@@ -49,9 +53,12 @@ def fmt_utc(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
 
 
-def add_http_log(message: str):
+def add_http_log(message: str, is_polling: bool = False):
     timestamp = fmt_utc(utc_now())
-    HTTP_LOGS.append(f"[{timestamp}] {message}")
+    HTTP_LOGS.append({
+        "message": f"[{timestamp}] {message}",
+        "is_polling": is_polling,
+    })
     if len(HTTP_LOGS) > MAX_LOGS:
         del HTTP_LOGS[0]
 
@@ -69,7 +76,8 @@ def update_result_state(source: str, count: int, error: str | None = None, detai
 def log_request(response):
     add_http_log(
         f'{request.remote_addr} "{request.method} {request.path}'
-        f'{("?" + request.query_string.decode()) if request.query_string else ""}" {response.status_code}'
+        f'{("?" + request.query_string.decode()) if request.query_string else ""}" {response.status_code}',
+        is_polling=request.path in POLLING_LOG_PATHS,
     )
     return response
 
@@ -132,6 +140,30 @@ def parse_positive_int(raw_value, default_value: int) -> int:
     return parsed if parsed > 0 else default_value
 
 
+def parse_bool_env(name: str, default_value: bool) -> bool:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default_value
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_runtime_settings() -> dict:
+    port = parse_positive_int(os.environ.get("MYSELLCOMB_PORT"), 5000)
+    debug_enabled = parse_bool_env("MYSELLCOMB_DEBUG", True)
+    use_reloader = parse_bool_env("MYSELLCOMB_USE_RELOADER", debug_enabled)
+    open_browser = parse_bool_env("MYSELLCOMB_OPEN_BROWSER", debug_enabled)
+    host = os.environ.get("MYSELLCOMB_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    browser_url = os.environ.get("MYSELLCOMB_BROWSER_URL", f"http://127.0.0.1:{port}/").strip()
+    return {
+        "host": host,
+        "port": port,
+        "debug": debug_enabled,
+        "use_reloader": use_reloader,
+        "open_browser": open_browser,
+        "browser_url": browser_url or f"http://127.0.0.1:{port}/",
+    }
+
+
 @app.route("/")
 def index():
     return render_template("index.html", products=[])
@@ -144,7 +176,13 @@ def health():
 
 @app.route("/logs")
 def logs():
-    return jsonify({"success": True, "logs": HTTP_LOGS[-120:]})
+    show_polling = str(request.args.get("show_polling", "")).strip().lower() in {"1", "true", "yes", "on"}
+    visible_logs = [
+        entry["message"]
+        for entry in HTTP_LOGS
+        if show_polling or not entry["is_polling"]
+    ]
+    return jsonify({"success": True, "logs": visible_logs[-120:], "show_polling": show_polling})
 
 
 @app.route("/crawl/status")
@@ -284,23 +322,39 @@ def fetch():
 @app.route("/fetch/tiktok/auto", methods=["POST"])
 def fetch_tiktok_auto():
     data = request.get_json(silent=True) or {}
-    keyword = str(data.get("keyword", "")).strip()
+    input_mode = str(data.get("input_mode", "keyword")).strip().lower() or "keyword"
+    save_mode = str(data.get("save_mode", "overwrite")).strip().lower() or "overwrite"
+    input_value = str(
+        data.get("input_value")
+        or data.get("keyword")
+        or data.get("video_url")
+        or ""
+    ).strip()
     limit = parse_positive_int(data.get("limit", 10), 10)
 
-    if not keyword:
-        return jsonify({"success": False, "error": "keyword is required for TikTok auto fetch."}), 400
+    if input_mode not in {"keyword", "url"}:
+        return jsonify({"success": False, "error": "input_mode must be 'keyword' or 'url'."}), 400
 
-    add_http_log(f"[NOTICE] [FETCH] tiktok auto fetch started / keyword={keyword} / limit={limit}")
+    if save_mode not in {"overwrite", "append"}:
+        return jsonify({"success": False, "error": "save_mode must be 'overwrite' or 'append'."}), 400
+
+    if not input_value:
+        field_label = "keyword" if input_mode == "keyword" else "video_url"
+        return jsonify({"success": False, "error": f"{field_label} is required for TikTok auto fetch."}), 400
+
+    add_http_log(
+        f"[NOTICE] [FETCH] tiktok auto fetch started / mode={input_mode} / input={input_value} / save_target={limit} / save_mode={save_mode}"
+    )
 
     try:
         tiktok_auto_fetch = getattr(import_module("crawler.tiktok_fetcher"), "fetch_auto")
-        result = tiktok_auto_fetch(keyword=keyword, limit=limit)
+        result = tiktok_auto_fetch(query=input_value, limit=limit, input_mode=input_mode, save_mode=save_mode)
     except ModuleNotFoundError as exc:
         update_result_state(
             "tiktok",
             0,
             error=str(exc),
-            details={"keyword": keyword, "limit": limit, "mode": "auto"},
+            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "limit": limit, "mode": "auto"},
         )
         add_http_log(f"[ERROR] [FETCH] tiktok dependency missing: {exc}")
         return jsonify(
@@ -315,20 +369,29 @@ def fetch_tiktok_auto():
             "tiktok",
             0,
             error=str(exc),
-            details={"keyword": keyword, "limit": limit, "mode": "auto"},
+            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "limit": limit, "mode": "auto"},
         )
         add_http_log(f"[ERROR] [FETCH] tiktok auto fetch failed: {exc}")
         return jsonify({"success": False, "source": "tiktok_auto", "error": str(exc)}), 500
 
     details = {
         "mode": "auto",
-        "keyword": keyword,
+        "keyword": result["keyword"],
+        "input_value": result["input_value"],
+        "input_mode": result["input_mode"],
+        "save_mode": result["save_mode"],
         "limit": limit,
+        "save_target_count": result["save_target_count"],
+        "discovery_limit": result["discovery_limit"],
         "discovered_count": result["discovered_count"],
         "saved_count": result["saved_count"],
         "sheet_name": result["sheet_name"],
         "save_error": result["save_error"],
         "blocked_reason": result["blocked_reason"],
+        "login_state": result.get("login_state"),
+        "login_state_before": result.get("login_state_before"),
+        "login_state_reason": result.get("login_state_reason"),
+        "removed_auth_cookie_names": result.get("removed_auth_cookie_names", []),
     }
     update_result_state(
         "tiktok",
@@ -337,55 +400,93 @@ def fetch_tiktok_auto():
         details=details,
     )
 
+    removed_auth_cookie_names = result.get("removed_auth_cookie_names", [])
+    remaining_auth_cookie_names = result.get("auth_cookie_names", [])
+    removed_auth_summary = (
+        f" / removed_auth_cookies={','.join(removed_auth_cookie_names)}"
+        if removed_auth_cookie_names
+        else ""
+    )
+    remaining_auth_summary = (
+        f" / remaining_auth_cookies={','.join(remaining_auth_cookie_names)}"
+        if remaining_auth_cookie_names
+        else ""
+    )
+    add_http_log(
+        "[NOTICE] [TIKTOK] "
+        f"session={result.get('login_state', 'unknown')} / "
+        f"before={result.get('login_state_before', 'unknown')} / "
+        f"reason={result.get('login_state_reason', 'unknown')}"
+        f"{removed_auth_summary}{remaining_auth_summary}"
+    )
+
     if result["blocked_reason"]:
         add_http_log(
             "[ERROR] [FETCH] "
-            f"tiktok blocked / keyword={keyword} / discovered={result['discovered_count']} / "
-            f"saved={result['saved_count']} / reason={result['blocked_reason']}"
+            f"tiktok blocked / mode={result['input_mode']} / input={result['input_value']} / discovered={result['discovered_count']} / save_mode={result['save_mode']} / "
+            f"saved={result['saved_count']} / session={result.get('login_state', 'unknown')} / "
+            f"reason={result['blocked_reason']}"
         )
         return jsonify(
             {
                 "success": False,
                 "source": "tiktok_auto",
-                "keyword": keyword,
+                "keyword": result["keyword"],
+                "input_value": result["input_value"],
+                "input_mode": result["input_mode"],
+                "save_mode": result["save_mode"],
+                "save_target_count": result["save_target_count"],
                 "discovered_count": result["discovered_count"],
                 "saved_count": result["saved_count"],
                 "products": result["products"],
                 "error": result["blocked_reason"],
                 "save_error": result["save_error"],
+                "login_state": result.get("login_state"),
+                "login_state_before": result.get("login_state_before"),
+                "login_state_reason": result.get("login_state_reason"),
             }
         ), 409
 
     add_http_log(
         "[CRAWL] "
-        f"tiktok auto fetch finished / keyword={keyword} / discovered={result['discovered_count']} / "
-        f"saved={result['saved_count']}"
+        f"tiktok auto fetch finished / mode={result['input_mode']} / input={result['input_value']} / discovered={result['discovered_count']} / save_mode={result['save_mode']} / "
+        f"saved={result['saved_count']} / session={result.get('login_state', 'unknown')}"
     )
     if result["save_error"]:
-        add_http_log(f"[ERROR] [SAVE] tiktok sheet save failed / keyword={keyword} / {result['save_error']}")
+        add_http_log(
+            f"[ERROR] [SAVE] tiktok sheet save failed / mode={result['input_mode']} / input={result['input_value']} / {result['save_error']}"
+        )
 
     return jsonify(
         {
             "success": True,
             "source": "tiktok_auto",
-            "keyword": keyword,
+            "keyword": result["keyword"],
+            "input_value": result["input_value"],
+            "input_mode": result["input_mode"],
+            "save_mode": result["save_mode"],
+            "save_target_count": result["save_target_count"],
+            "discovery_limit": result["discovery_limit"],
             "count": len(result["products"]),
             "discovered_count": result["discovered_count"],
             "saved_count": result["saved_count"],
             "sheet_name": result["sheet_name"],
             "products": result["products"],
             "save_error": result["save_error"],
+            "login_state": result.get("login_state"),
+            "login_state_before": result.get("login_state_before"),
+            "login_state_reason": result.get("login_state_reason"),
         }
     )
 
 
-def open_dashboard_in_chrome():
+def open_dashboard_in_chrome(browser_url: str):
     time.sleep(1.5)
 
     if os.path.exists(CHROME_PATH):
         try:
-            subprocess.Popen([CHROME_PATH, DASHBOARD_URL])
-            print(f"Dashboard opened in Chrome: {DASHBOARD_URL}")
+            subprocess.Popen([CHROME_PATH, browser_url])
+            print(f"Dashboard opened in Chrome: {browser_url}")
         except Exception as exc:
             print(f"Chrome launch failed: {exc}")
     else:
@@ -393,7 +494,20 @@ def open_dashboard_in_chrome():
 
 
 if __name__ == "__main__":
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        threading.Thread(target=open_dashboard_in_chrome, daemon=True).start()
+    runtime_settings = get_runtime_settings()
+    should_open_browser = runtime_settings["open_browser"] and (
+        not runtime_settings["use_reloader"] or os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+    )
+    if should_open_browser:
+        threading.Thread(
+            target=open_dashboard_in_chrome,
+            args=(runtime_settings["browser_url"],),
+            daemon=True,
+        ).start()
 
-    app.run(debug=True)
+    app.run(
+        host=runtime_settings["host"],
+        port=runtime_settings["port"],
+        debug=runtime_settings["debug"],
+        use_reloader=runtime_settings["use_reloader"],
+    )

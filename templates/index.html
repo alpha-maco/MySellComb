@@ -40,13 +40,26 @@
                     </div>
 
                     <div id="tiktokControls" class="tiktok-config hidden">
-                        <div class="input-group">
-                            <label for="tiktokKeyword">TikTok keyword</label>
-                            <input id="tiktokKeyword" type="text" placeholder="e.g. camping gear">
+                        <div class="input-group input-group-wide">
+                            <label for="tiktokQueryInput">TikTok keyword / video URL</label>
+                            <div class="input-combo">
+                                <select id="tiktokInputMode" onchange="updateTiktokInputModeUI()">
+                                    <option value="keyword" selected>Keyword</option>
+                                    <option value="url">Video URL</option>
+                                </select>
+                                <input id="tiktokQueryInput" type="text" placeholder="e.g. camping gear">
+                            </div>
                         </div>
                         <div class="input-group">
-                            <label for="tiktokLimit">Top video count</label>
+                            <label for="tiktokLimit">Google Sheet save count</label>
                             <input id="tiktokLimit" type="number" min="1" max="30" value="10">
+                        </div>
+                        <div class="input-group">
+                            <label for="tiktokSaveMode">Same-day save mode</label>
+                            <select id="tiktokSaveMode">
+                                <option value="overwrite" selected>Overwrite same keyword today</option>
+                                <option value="append">Append today</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -62,6 +75,7 @@
                     <button class="action-btn danger" onclick="stopCrawl()">Stop repeat crawl</button>
                     <button class="action-btn secondary" onclick="runSelectedFetch()">Run fetch now</button>
                     <button class="action-btn neutral" onclick="checkHealth()">Health check</button>
+                    <button id="togglePollingLogsBtn" class="action-btn quiet" onclick="togglePollingLogs()">Show polling logs</button>
                 </div>
 
                 <div id="crawlStatus" class="status-box stopped">Waiting for a request.</div>
@@ -92,6 +106,7 @@
 
     <script>
         let selectedSource = "coupang";
+        let showPollingLogs = false;
 
         function selectSource(source) {
             selectedSource = source;
@@ -110,7 +125,7 @@
             document.getElementById("tiktokControls").classList.toggle("hidden", source !== "tiktok");
             document.getElementById("resultInfo").textContent =
                 source === "tiktok"
-                    ? "TikTok auto mode selected. Enter a keyword and a top-N limit."
+                    ? "TikTok auto mode selected. Choose keyword or video URL, set the final Google Sheet save count, and choose overwrite or append for today's same-keyword rows. Logged-out session will be enforced."
                     : `Selected source: ${source}`;
         }
 
@@ -122,6 +137,56 @@
                 .replaceAll(">", "&gt;")
                 .replaceAll('"', "&quot;")
                 .replaceAll("'", "&#039;");
+        }
+
+        function refreshPollingLogButton() {
+            const button = document.getElementById("togglePollingLogsBtn");
+            button.textContent = showPollingLogs ? "Hide polling logs" : "Show polling logs";
+        }
+
+        async function togglePollingLogs() {
+            showPollingLogs = !showPollingLogs;
+            refreshPollingLogButton();
+            await loadLogs();
+        }
+
+        function updateTiktokInputModeUI() {
+            const mode = document.getElementById("tiktokInputMode").value;
+            const input = document.getElementById("tiktokQueryInput");
+
+            if (mode === "url") {
+                input.placeholder = "https://www.tiktok.com/@user/video/1234567890";
+                return;
+            }
+
+            input.placeholder = "e.g. camping gear";
+        }
+
+        function formatTiktokSessionSuffix(data) {
+            if (!data || !data.login_state) return "";
+            let suffix = ` / session=${data.login_state}`;
+            if (data.login_state_before && data.login_state_before !== data.login_state) {
+                suffix += ` (before=${data.login_state_before})`;
+            }
+            if (data.login_state_reason) {
+                suffix += ` / session_reason=${data.login_state_reason}`;
+            }
+            return suffix;
+        }
+
+        function parseMetricNumber(value) {
+            if (value === null || value === undefined) return 0;
+            const text = String(value).replaceAll(",", "").trim().toUpperCase();
+            if (!text) return 0;
+
+            const multiplier =
+                text.endsWith("K") ? 1000 :
+                text.endsWith("M") ? 1000000 :
+                text.endsWith("B") ? 1000000000 :
+                1;
+            const raw = multiplier === 1 ? text : text.slice(0, -1);
+            const numberValue = Number(raw);
+            return Number.isFinite(numberValue) ? numberValue * multiplier : 0;
         }
 
         function renderProducts(source, products) {
@@ -137,7 +202,15 @@
                 return;
             }
 
-            for (const product of products) {
+            const renderItems = source === "tiktok"
+                ? [...products].sort((a, b) => {
+                    const aViews = Number(a.view_count_num ?? parseMetricNumber(a.view_count));
+                    const bViews = Number(b.view_count_num ?? parseMetricNumber(b.view_count));
+                    return bViews - aViews;
+                })
+                : products;
+
+            for (const product of renderItems) {
                 const row = document.createElement("tr");
                 const linkHtml = product.link
                     ? `<a href="${escapeHtml(product.link)}" target="_blank" rel="noreferrer">Open</a>`
@@ -178,29 +251,34 @@
         }
 
         async function runTiktokAutoFetch() {
-            const keyword = document.getElementById("tiktokKeyword").value.trim();
+            const inputMode = document.getElementById("tiktokInputMode").value;
+            const inputValue = document.getElementById("tiktokQueryInput").value.trim();
             const limit = Number(document.getElementById("tiktokLimit").value || 10);
+            const saveMode = document.getElementById("tiktokSaveMode").value;
             const resultInfo = document.getElementById("resultInfo");
 
-            if (!keyword) {
-                resultInfo.textContent = "TikTok keyword is required.";
+            if (!inputValue) {
+                resultInfo.textContent = inputMode === "url"
+                    ? "TikTok video URL is required."
+                    : "TikTok keyword is required.";
                 return;
             }
 
-            resultInfo.textContent = `TikTok auto fetch in progress / keyword=${keyword} / top=${limit}`;
+            resultInfo.textContent = `TikTok auto fetch in progress / mode=${inputMode} / input=${inputValue} / save_target=${limit} / save_mode=${saveMode} / session=checking`;
 
             try {
                 const response = await fetch("/fetch/tiktok/auto", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ keyword, limit })
+                    body: JSON.stringify({ input_mode: inputMode, input_value: inputValue, limit, save_mode: saveMode })
                 });
 
                 const data = await response.json();
+                const sessionSuffix = formatTiktokSessionSuffix(data);
 
                 if (!response.ok || !data.success) {
                     const blockedSuffix = data.save_error ? ` / save_error=${data.save_error}` : "";
-                    resultInfo.textContent = `Error: ${data.error || "TikTok auto fetch failed"}${blockedSuffix}`;
+                    resultInfo.textContent = `Error: ${data.error || "TikTok auto fetch failed"}${blockedSuffix}${sessionSuffix}`;
                     renderProducts("tiktok", data.products || []);
                     await loadLogs();
                     await loadCrawlStatus();
@@ -209,7 +287,7 @@
 
                 const saveSuffix = data.save_error ? ` / save_error=${data.save_error}` : "";
                 resultInfo.textContent =
-                    `TikTok auto fetch completed / keyword=${data.keyword} / discovered=${data.discovered_count} / saved=${data.saved_count}${saveSuffix}`;
+                    `TikTok auto fetch completed / mode=${data.input_mode} / input=${data.input_value} / discovered=${data.discovered_count} / save_target=${data.save_target_count} / save_mode=${data.save_mode} / saved=${data.saved_count}${saveSuffix}${sessionSuffix}`;
                 renderProducts("tiktok", data.products);
                 await loadLogs();
                 await loadCrawlStatus();
@@ -316,7 +394,7 @@
 
         async function loadLogs() {
             try {
-                const response = await fetch("/logs");
+                const response = await fetch(`/logs?show_polling=${showPollingLogs ? 1 : 0}`);
                 const data = await response.json();
                 if (!data.success) return;
 
@@ -359,8 +437,21 @@
 
                 const tiktokDetails = (data.last_details || {}).tiktok || {};
                 const tiktokError = (data.last_error || {}).tiktok || "";
-                const tiktokSummary = tiktokDetails.keyword
-                    ? ` / tiktok keyword=${tiktokDetails.keyword} discovered=${tiktokDetails.discovered_count ?? 0} saved=${tiktokDetails.saved_count ?? 0}`
+                const tiktokSession = tiktokDetails.login_state
+                    ? ` / session=${tiktokDetails.login_state}`
+                    : "";
+                const tiktokSessionReason = tiktokDetails.login_state_reason
+                    ? ` / session_reason=${tiktokDetails.login_state_reason}`
+                    : "";
+                const tiktokInputLabel = tiktokDetails.input_mode === "url" ? "url" : "keyword";
+                const tiktokInputSummary = tiktokDetails.input_value
+                    ? ` ${tiktokInputLabel}=${tiktokDetails.input_value}`
+                    : "";
+                const tiktokSaveMode = tiktokDetails.save_mode
+                    ? ` / save_mode=${tiktokDetails.save_mode}`
+                    : "";
+                const tiktokSummary = tiktokDetails.input_value
+                    ? ` / tiktok${tiktokInputSummary} discovered=${tiktokDetails.discovered_count ?? 0} save_target=${tiktokDetails.save_target_count ?? 0}${tiktokSaveMode} saved=${tiktokDetails.saved_count ?? 0}${tiktokSession}${tiktokSessionReason}`
                     : "";
                 const errorSummary = tiktokError ? ` / last_error=${tiktokError}` : "";
 
@@ -373,6 +464,8 @@
         }
 
         selectSource("coupang");
+        updateTiktokInputModeUI();
+        refreshPollingLogButton();
         loadLogs();
         loadCrawlStatus();
         setInterval(loadLogs, 2000);
