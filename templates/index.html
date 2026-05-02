@@ -61,6 +61,46 @@
                                 <option value="append">Append today</option>
                             </select>
                         </div>
+                        <div class="tiktok-batch-card">
+                            <div class="batch-card-header">
+                                <div>
+                                    <span class="batch-card-eyebrow">Live TikTok Daily Batch (KST)</span>
+                                    <h3>Weekday / Weekend Time Slots</h3>
+                                    <p>Fixed daily windows are 03:00, 04:00, 05:00, 06:00, and 07:00 KST. Choose which slots remain active for weekdays and weekends.</p>
+                                </div>
+                                <div class="batch-card-actions">
+                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekday', true)">Weekday all</button>
+                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekday', false)">Weekday clear</button>
+                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekend', true)">Weekend all</button>
+                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekend', false)">Weekend clear</button>
+                                </div>
+                            </div>
+                            <div class="batch-matrix">
+                                <div class="batch-matrix-row">
+                                    <div class="batch-matrix-label">Weekdays</div>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="03:00" onchange="handleTiktokBatchSlotChange()"><span>03:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="04:00" onchange="handleTiktokBatchSlotChange()"><span>04:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="05:00" onchange="handleTiktokBatchSlotChange()"><span>05:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="06:00" onchange="handleTiktokBatchSlotChange()"><span>06:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="07:00" onchange="handleTiktokBatchSlotChange()"><span>07:00</span></label>
+                                </div>
+                                <div class="batch-matrix-row">
+                                    <div class="batch-matrix-label">Weekend</div>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="03:00" onchange="handleTiktokBatchSlotChange()"><span>03:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="04:00" onchange="handleTiktokBatchSlotChange()"><span>04:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="05:00" onchange="handleTiktokBatchSlotChange()"><span>05:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="06:00" onchange="handleTiktokBatchSlotChange()"><span>06:00</span></label>
+                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="07:00" onchange="handleTiktokBatchSlotChange()"><span>07:00</span></label>
+                                </div>
+                            </div>
+                            <div class="batch-card-footer">
+                                <div class="batch-card-buttons">
+                                    <button type="button" class="action-btn primary" onclick="saveTiktokBatchSchedule()">Save TikTok batch schedule</button>
+                                    <button type="button" class="action-btn quiet" onclick="resetTiktokBatchScheduleToDefault()">Reset to daily default</button>
+                                </div>
+                                <div id="tiktokBatchScheduleSummary" class="batch-schedule-summary">Loading TikTok batch schedule...</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -107,6 +147,7 @@
     <script>
         let selectedSource = "coupang";
         let showPollingLogs = false;
+        const TIKTOK_BATCH_SLOTS = ["03:00", "04:00", "05:00", "06:00", "07:00"];
 
         function selectSource(source) {
             selectedSource = source;
@@ -125,8 +166,138 @@
             document.getElementById("tiktokControls").classList.toggle("hidden", source !== "tiktok");
             document.getElementById("resultInfo").textContent =
                 source === "tiktok"
-                    ? "TikTok auto mode selected. Choose keyword or video URL, set the final Google Sheet save count, and choose overwrite or append for today's same-keyword rows. Logged-out session will be enforced."
+                    ? "TikTok auto mode selected. Choose keyword or video URL, set the final Google Sheet save count, choose overwrite or append for today's same-keyword rows, and manage Live batch slots below in KST. Logged-out session will be enforced."
                     : `Selected source: ${source}`;
+        }
+
+        function getDefaultTiktokBatchSchedule() {
+            return {
+                timezone: "Asia/Seoul",
+                available_slots: [...TIKTOK_BATCH_SLOTS],
+                weekday: [...TIKTOK_BATCH_SLOTS],
+                weekend: [...TIKTOK_BATCH_SLOTS]
+            };
+        }
+
+        function normalizeTiktokBatchSchedule(schedule) {
+            const fallback = getDefaultTiktokBatchSchedule();
+            const safeSchedule = schedule && typeof schedule === "object" ? schedule : {};
+
+            const normalizeDay = (dayType) => {
+                const rawValues = Array.isArray(safeSchedule[dayType]) ? safeSchedule[dayType] : fallback[dayType];
+                const selected = new Set(rawValues.map((value) => String(value).trim()));
+                return TIKTOK_BATCH_SLOTS.filter((slot) => selected.has(slot));
+            };
+
+            return {
+                timezone: "Asia/Seoul",
+                available_slots: [...TIKTOK_BATCH_SLOTS],
+                weekday: normalizeDay("weekday"),
+                weekend: normalizeDay("weekend")
+            };
+        }
+
+        function getTiktokBatchCheckboxes(dayType) {
+            return Array.from(document.querySelectorAll(`input[data-day-type="${dayType}"]`));
+        }
+
+        function applyTiktokBatchScheduleToUI(schedule) {
+            const normalized = normalizeTiktokBatchSchedule(schedule);
+
+            for (const dayType of ["weekday", "weekend"]) {
+                const selected = new Set(normalized[dayType]);
+                for (const checkbox of getTiktokBatchCheckboxes(dayType)) {
+                    checkbox.checked = selected.has(checkbox.value);
+                }
+            }
+
+            updateTiktokBatchScheduleSummary(normalized);
+        }
+
+        function readTiktokBatchScheduleFromUI() {
+            const buildDay = (dayType) =>
+                getTiktokBatchCheckboxes(dayType)
+                    .filter((checkbox) => checkbox.checked)
+                    .map((checkbox) => checkbox.value);
+
+            return normalizeTiktokBatchSchedule({
+                weekday: buildDay("weekday"),
+                weekend: buildDay("weekend")
+            });
+        }
+
+        function formatTiktokBatchSummaryLine(label, values) {
+            return `${label}: ${values.length ? values.join(", ") : "off"}`;
+        }
+
+        function updateTiktokBatchScheduleSummary(schedule = readTiktokBatchScheduleFromUI()) {
+            const normalized = normalizeTiktokBatchSchedule(schedule);
+            const summary = document.getElementById("tiktokBatchScheduleSummary");
+            summary.textContent =
+                `${formatTiktokBatchSummaryLine("Weekdays", normalized.weekday)} / ` +
+                `${formatTiktokBatchSummaryLine("Weekend", normalized.weekend)} / ` +
+                `timezone=${normalized.timezone}`;
+        }
+
+        function handleTiktokBatchSlotChange() {
+            updateTiktokBatchScheduleSummary();
+        }
+
+        function applyTiktokBatchPreset(dayType, enabled) {
+            for (const checkbox of getTiktokBatchCheckboxes(dayType)) {
+                checkbox.checked = enabled;
+            }
+            updateTiktokBatchScheduleSummary();
+        }
+
+        function resetTiktokBatchScheduleToDefault() {
+            applyTiktokBatchScheduleToUI(getDefaultTiktokBatchSchedule());
+            document.getElementById("resultInfo").textContent =
+                "TikTok batch schedule reset in the UI. Save it to apply the daily 03:00-07:00 KST defaults.";
+        }
+
+        async function loadTiktokBatchSchedule() {
+            try {
+                const response = await fetch("/settings/tiktok-batch-schedule");
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    applyTiktokBatchScheduleToUI(getDefaultTiktokBatchSchedule());
+                    return;
+                }
+
+                applyTiktokBatchScheduleToUI(data.schedule);
+            } catch (error) {
+                console.error("Failed to load TikTok batch schedule:", error);
+                applyTiktokBatchScheduleToUI(getDefaultTiktokBatchSchedule());
+            }
+        }
+
+        async function saveTiktokBatchSchedule() {
+            const schedule = readTiktokBatchScheduleFromUI();
+            const resultInfo = document.getElementById("resultInfo");
+
+            try {
+                const response = await fetch("/settings/tiktok-batch-schedule", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(schedule)
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    resultInfo.textContent = `Error: ${data.error || "TikTok batch schedule failed to save."}`;
+                    return;
+                }
+
+                applyTiktokBatchScheduleToUI(data.schedule);
+                resultInfo.textContent =
+                    `TikTok batch schedule saved / weekdays=${data.schedule.weekday.join(", ") || "off"} / ` +
+                    `weekend=${data.schedule.weekend.join(", ") || "off"} / timezone=${data.schedule.timezone}`;
+                await loadLogs();
+            } catch (error) {
+                resultInfo.textContent = `Error: ${error.message}`;
+            }
         }
 
         function escapeHtml(value) {
@@ -466,6 +637,7 @@
         selectSource("coupang");
         updateTiktokInputModeUI();
         refreshPollingLogButton();
+        loadTiktokBatchSchedule();
         loadLogs();
         loadCrawlStatus();
         setInterval(loadLogs, 2000);

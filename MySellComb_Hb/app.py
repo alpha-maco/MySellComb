@@ -26,6 +26,7 @@ def _configure_default_env() -> None:
     port = (os.environ.get("MYSELLCOMB_PORT") or "5010").strip() or "5010"
     os.environ.setdefault("MYSELLCOMB_BROWSER_URL", f"http://127.0.0.1:{port}/")
     os.environ.setdefault("MYSELLCOMB_BROWSER_PROFILE_ROOT", str(BROWSER_PROFILE_ROOT))
+    os.environ.setdefault("MYSELLCOMB_DATA_ROOT", str(HB_ROOT / "data"))
     os.environ.setdefault("TIKTOK_WORKSHEET_NAME", "TikTok_Hb")
 
     credentials_path = LIVE_ROOT / "credentials.json"

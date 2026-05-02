@@ -1,14 +1,18 @@
+import json
 import os
 import subprocess
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 from importlib import import_module
+from pathlib import Path
 
 import bootstrap
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 FETCHER_IMPORTS = {
     "naver": ("crawler.naver_fetcher", "fetch"),
@@ -24,6 +28,13 @@ MAX_LOGS = 300
 POLLING_LOG_PATHS = {
     "/logs",
     "/crawl/status",
+}
+
+TIKTOK_BATCH_SLOTS = ("03:00", "04:00", "05:00", "06:00", "07:00")
+DEFAULT_TIKTOK_BATCH_SCHEDULE = {
+    "timezone": "Asia/Seoul",
+    "weekday": list(TIKTOK_BATCH_SLOTS),
+    "weekend": list(TIKTOK_BATCH_SLOTS),
 }
 
 CRAWL_STATE = {
@@ -50,6 +61,55 @@ def fmt_utc(dt):
     if not dt:
         return None
     return dt.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + " UTC"
+
+
+def get_data_root() -> Path:
+    configured_root = (os.environ.get("MYSELLCOMB_DATA_ROOT") or "").strip()
+    data_root = Path(configured_root) if configured_root else PROJECT_ROOT / "data"
+    data_root.mkdir(parents=True, exist_ok=True)
+    return data_root
+
+
+def get_tiktok_batch_schedule_path() -> Path:
+    return get_data_root() / "tiktok_batch_schedule.json"
+
+
+def normalize_tiktok_batch_schedule(payload: dict | None) -> dict:
+    source = payload if isinstance(payload, dict) else {}
+    normalized = {
+        "timezone": DEFAULT_TIKTOK_BATCH_SCHEDULE["timezone"],
+        "available_slots": list(TIKTOK_BATCH_SLOTS),
+    }
+
+    for day_type in ("weekday", "weekend"):
+        raw_values = source.get(day_type, DEFAULT_TIKTOK_BATCH_SCHEDULE[day_type])
+        if not isinstance(raw_values, list):
+            raw_values = DEFAULT_TIKTOK_BATCH_SCHEDULE[day_type]
+
+        selected_values = {str(value).strip() for value in raw_values}
+        normalized[day_type] = [slot for slot in TIKTOK_BATCH_SLOTS if slot in selected_values]
+
+    return normalized
+
+
+def load_tiktok_batch_schedule() -> dict:
+    schedule_path = get_tiktok_batch_schedule_path()
+    if not schedule_path.exists():
+        return normalize_tiktok_batch_schedule(DEFAULT_TIKTOK_BATCH_SCHEDULE)
+
+    try:
+        payload = json.loads(schedule_path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = DEFAULT_TIKTOK_BATCH_SCHEDULE
+
+    return normalize_tiktok_batch_schedule(payload)
+
+
+def save_tiktok_batch_schedule(schedule: dict) -> dict:
+    normalized = normalize_tiktok_batch_schedule(schedule)
+    schedule_path = get_tiktok_batch_schedule_path()
+    schedule_path.write_text(json.dumps(normalized, ensure_ascii=False, indent=2), encoding="utf-8")
+    return normalized
 
 
 def add_http_log(message: str, is_polling: bool = False):
@@ -171,6 +231,22 @@ def index():
 @app.route("/health")
 def health():
     return jsonify({"status": "ok", "available_sources": AVAILABLE_SOURCES})
+
+
+@app.route("/settings/tiktok-batch-schedule", methods=["GET", "POST"])
+def tiktok_batch_schedule():
+    if request.method == "GET":
+        return jsonify({"success": True, "schedule": load_tiktok_batch_schedule()})
+
+    data = request.get_json(silent=True) or {}
+    schedule = save_tiktok_batch_schedule(data)
+    add_http_log(
+        "[NOTICE] [TIKTOK] batch schedule saved / "
+        f"weekday={','.join(schedule['weekday']) or '-'} / "
+        f"weekend={','.join(schedule['weekend']) or '-'} / "
+        f"timezone={schedule['timezone']}"
+    )
+    return jsonify({"success": True, "message": "TikTok batch schedule saved.", "schedule": schedule})
 
 
 @app.route("/logs")

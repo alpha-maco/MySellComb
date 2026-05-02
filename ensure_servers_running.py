@@ -33,6 +33,12 @@ def health_url(port: int) -> str:
     return f"http://127.0.0.1:{port}/health"
 
 
+def safe_print(message: str) -> None:
+    output_encoding = sys.stdout.encoding or "utf-8"
+    safe_message = message.encode(output_encoding, errors="replace").decode(output_encoding, errors="replace")
+    print(safe_message)
+
+
 def read_health(port: int) -> tuple[bool, str]:
     req = request.Request(health_url(port), method="GET")
     try:
@@ -51,10 +57,10 @@ def read_health(port: int) -> tuple[bool, str]:
 def ensure_server(server: dict) -> bool:
     ok, detail = read_health(server["port"])
     if ok:
-        print(f"[OK] {server['name']} already healthy on {server['port']}")
+        safe_print(f"[OK] {server['name']} already healthy on {server['port']}")
         return True
 
-    print(f"[WAIT] {server['name']} is down on {server['port']} ({detail})")
+    safe_print(f"[WAIT] {server['name']} is down on {server['port']} ({detail})")
     result = subprocess.run(
         [sys.executable, str(server["launch_script"])],
         cwd=server["root"],
@@ -66,25 +72,25 @@ def ensure_server(server: dict) -> bool:
         check=False,
     )
     if result.stdout.strip():
-        print(f"[LAUNCH] {server['name']} stdout: {result.stdout.strip()}")
+        safe_print(f"[LAUNCH] {server['name']} stdout: {result.stdout.strip()}")
     if result.stderr.strip():
-        print(f"[LAUNCH] {server['name']} stderr: {result.stderr.strip()}")
+        safe_print(f"[LAUNCH] {server['name']} stderr: {result.stderr.strip()}")
     if result.returncode != 0:
-        print(f"[ERROR] {server['name']} launcher returned {result.returncode}")
+        safe_print(f"[ERROR] {server['name']} launcher returned {result.returncode}")
         return False
 
     for attempt in range(HEALTH_RETRY_COUNT):
         time.sleep(HEALTH_RETRY_SECONDS)
         ok, detail = read_health(server["port"])
         if ok:
-            print(f"[OK] {server['name']} started on {server['port']}")
+            safe_print(f"[OK] {server['name']} started on {server['port']}")
             return True
-        print(
+        safe_print(
             f"[RETRY] {server['name']} health {attempt + 1}/{HEALTH_RETRY_COUNT} "
             f"not ready ({detail})"
         )
 
-    print(f"[ERROR] {server['name']} did not become healthy on {server['port']}")
+    safe_print(f"[ERROR] {server['name']} did not become healthy on {server['port']}")
     return False
 
 
