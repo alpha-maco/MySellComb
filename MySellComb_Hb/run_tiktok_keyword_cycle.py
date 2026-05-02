@@ -11,6 +11,7 @@ from urllib import error, request
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("TIKTOK_WORKSHEET_NAME", "TikTok_Hb")
 
 
 def _resolve_server_port() -> int:
@@ -18,15 +19,15 @@ def _resolve_server_port() -> int:
     try:
         parsed = int(str(raw_value).strip())
     except (TypeError, ValueError):
-        return 5000
-    return parsed if parsed > 0 else 5000
+        return 5010
+    return parsed if parsed > 0 else 5010
 
 
 SERVER_PORT = _resolve_server_port()
 HEALTH_URL = f"http://127.0.0.1:{SERVER_PORT}/health"
 FETCH_URL = f"http://127.0.0.1:{SERVER_PORT}/fetch/tiktok/auto"
 KEYWORDS = ["다이소", "어린이날", "어버이날"]
-SAVE_TARGET_COUNT = 30
+SAVE_TARGET_COUNT = 2
 SAVE_MODE = "overwrite"
 PROFILE_MODE = "automation"
 KEYWORD_DELAY_SECONDS = 8
@@ -76,12 +77,12 @@ def ensure_server_running() -> None:
     try:
         status, payload = read_json(HEALTH_URL)
         if status == 200 and payload.get("status") == "ok":
-            log("Live dashboard health check passed.")
+            log("Hb서버 health check passed.")
             return
     except Exception as exc:
-        log(f"Live dashboard health check failed before restart: {exc}")
+        log(f"Hb서버 health check failed before restart: {exc}")
 
-    log("Live dashboard is down. Launching local server.")
+    log("Hb서버 is down. Launching local server.")
     result = subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "launch_dashboard.py")],
         cwd=PROJECT_ROOT,
@@ -100,13 +101,13 @@ def ensure_server_running() -> None:
         try:
             status, payload = read_json(HEALTH_URL)
             if status == 200 and payload.get("status") == "ok":
-                log("Live dashboard restarted successfully.")
+                log("Hb서버 restarted successfully.")
                 return
         except Exception as exc:
             log(f"Health retry {attempt + 1}/{HEALTH_RETRY_COUNT} failed: {exc}")
         time.sleep(HEALTH_RETRY_SECONDS)
 
-    raise RuntimeError("Live dashboard did not recover after restart attempts.")
+    raise RuntimeError("Hb서버 did not recover after restart attempts.")
 
 
 def run_keyword(keyword: str) -> dict:
@@ -118,7 +119,7 @@ def run_keyword(keyword: str) -> dict:
         "profile_mode": PROFILE_MODE,
     }
     status, data = read_json(FETCH_URL, payload=payload)
-    result = {
+    return {
         "keyword": keyword,
         "http_status": status,
         "success": status == 200 and bool(data.get("success")),
@@ -128,13 +129,12 @@ def run_keyword(keyword: str) -> dict:
         "login_state": data.get("login_state"),
         "error": data.get("error") or data.get("save_error"),
     }
-    return result
 
 
 def main() -> int:
     ensure_server_running()
     log(
-        "Starting live TikTok keyword cycle: "
+        "Starting Hb서버 TikTok keyword cycle: "
         f"keywords={KEYWORDS}, save_target={SAVE_TARGET_COUNT}, save_mode={SAVE_MODE}, profile_mode={PROFILE_MODE}, port={SERVER_PORT}"
     )
 
@@ -168,10 +168,10 @@ def main() -> int:
             time.sleep(KEYWORD_DELAY_SECONDS)
 
     if failures:
-        log(f"Live TikTok keyword cycle finished with failures={failures}.")
+        log(f"Hb서버 TikTok keyword cycle finished with failures={failures}.")
         return 1
 
-    log("Live TikTok keyword cycle finished successfully.")
+    log("Hb서버 TikTok keyword cycle finished successfully.")
     return 0
 
 

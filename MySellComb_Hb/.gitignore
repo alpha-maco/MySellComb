@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Runtime
+data/
+hb_server_stdout.log
+hb_server_stderr.log
+
+# Browser session
+crawler/browser_profile/
+
+# IDE / OS
+.vscode/
+.DS_Store
+Thumbs.db

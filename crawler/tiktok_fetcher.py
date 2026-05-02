@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -9,9 +11,11 @@ from urllib.parse import quote
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
+from .runtime_paths import get_browser_profile_dir
 from .saver import save_to_sheet
 
-PROFILE_DIR = Path(__file__).resolve().parent / "browser_profile" / "tiktok_chrome"
+PROFILE_DIR = get_browser_profile_dir("tiktok_chrome")
+AUTOMATION_PROFILE_DIR = get_browser_profile_dir("tiktok_chrome_automation")
 DEFAULT_LIMIT = 10
 DISCOVERY_MULTIPLIER = 2
 DISCOVERY_BUFFER = 4
@@ -313,26 +317,112 @@ def _ensure_logged_out_session(context) -> dict:
     }
 
 
-def _launch_context(playwright):
-    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    context = playwright.chromium.launch_persistent_context(
-        user_data_dir=str(PROFILE_DIR),
-        channel="chrome",
-        headless=False,
-        slow_mo=80,
-        args=[
+def _resolve_profile_dir(profile_mode: str) -> Path:
+    return AUTOMATION_PROFILE_DIR if profile_mode == "automation" else PROFILE_DIR
+
+
+def _clear_profile_lockfiles(profile_dir: Path) -> None:
+    for pattern in ("lockfile", "Singleton*", "*.lock", "*.LOCK"):
+        for path in profile_dir.glob(pattern):
+            try:
+                if path.is_file() or path.is_symlink():
+                    path.unlink(missing_ok=True)
+            except Exception:
+                continue
+
+
+def _reset_profile_dir(profile_dir: Path) -> None:
+    if not profile_dir.exists():
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        return
+
+    stale_dir = profile_dir.with_name(
+        f"{profile_dir.name}_stale_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    )
+
+    try:
+        profile_dir.rename(stale_dir)
+    except Exception:
+        try:
+            shutil.rmtree(profile_dir, ignore_errors=True)
+        except Exception:
+            return
+
+    profile_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _prune_stale_runtime_profiles(runtime_root: Path, max_age_hours: int = 12) -> None:
+    cutoff = datetime.now().timestamp() - (max_age_hours * 60 * 60)
+    for path in runtime_root.iterdir():
+        try:
+            if path.is_dir() and path.stat().st_mtime < cutoff:
+                shutil.rmtree(path, ignore_errors=True)
+        except Exception:
+            continue
+
+
+def _create_automation_runtime_profile(base_profile_dir: Path) -> Path:
+    runtime_root = base_profile_dir.parent / f"{base_profile_dir.name}_runtime"
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    _prune_stale_runtime_profiles(runtime_root)
+    runtime_profile_dir = Path(tempfile.mkdtemp(prefix="run_", dir=runtime_root))
+
+    for child in base_profile_dir.iterdir():
+        target = runtime_profile_dir / child.name
+        try:
+            if child.is_dir():
+                shutil.copytree(child, target, dirs_exist_ok=True)
+            elif child.is_file():
+                shutil.copy2(child, target)
+        except Exception:
+            continue
+
+    _clear_profile_lockfiles(runtime_profile_dir)
+    return runtime_profile_dir
+
+
+def _launch_context(playwright, profile_mode: str = "default"):
+    base_profile_dir = _resolve_profile_dir(profile_mode)
+    base_profile_dir.mkdir(parents=True, exist_ok=True)
+    launch_kwargs = {
+        "user_data_dir": str(base_profile_dir),
+        "channel": "chrome",
+        "headless": False,
+        "slow_mo": 80,
+        "args": [
             "--disable-blink-features=AutomationControlled",
             "--start-maximized",
             "--lang=en-US",
         ],
-        locale="en-US",
-        timezone_id="Asia/Seoul",
-        user_agent=(
+        "locale": "en-US",
+        "timezone_id": "Asia/Seoul",
+        "user_agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/135.0.0.0 Safari/537.36"
         ),
-    )
+    }
+
+    last_error = None
+    for attempt in range(2):
+        profile_dir = base_profile_dir
+        if profile_mode == "automation":
+            # Automation runs do not rely on persisted login state, so launch
+            # them with a fresh runtime profile to avoid lock/corruption issues.
+            profile_dir = _create_automation_runtime_profile(base_profile_dir)
+            launch_kwargs["user_data_dir"] = str(profile_dir)
+        elif attempt == 0:
+            _clear_profile_lockfiles(profile_dir)
+        else:
+            _reset_profile_dir(profile_dir)
+        try:
+            context = playwright.chromium.launch_persistent_context(**launch_kwargs)
+            break
+        except Exception as exc:
+            last_error = exc
+    else:
+        raise last_error
+
     context.set_default_timeout(12000)
     context.set_default_navigation_timeout(30000)
     return context
@@ -551,10 +641,10 @@ def _parse_tiktok_page(page, url: str, keyword: str) -> dict:
     }
 
 
-def fetch(urls: list[str]) -> list[dict]:
+def fetch(urls: list[str], profile_mode: str = "default") -> list[dict]:
     results = []
     with sync_playwright() as playwright:
-        context = _launch_context(playwright)
+        context = _launch_context(playwright, profile_mode=profile_mode)
         page = context.new_page()
         try:
             session_info = _ensure_logged_out_session(context)
@@ -579,6 +669,7 @@ def fetch_auto(
     limit: int = DEFAULT_LIMIT,
     input_mode: str = "keyword",
     save_mode: str = "overwrite",
+    profile_mode: str = "default",
 ) -> dict:
     query = query.strip()
     input_mode = (input_mode or "keyword").strip().lower()
@@ -589,6 +680,7 @@ def fetch_auto(
     discovery_limit = _calculate_discovery_limit(save_target_count)
     products: list[dict] = []
     blocked_reason = None
+    fetch_warnings: list[str] = []
     video_urls: list[str] = []
     session_info = {
         "login_state": "unknown",
@@ -601,7 +693,7 @@ def fetch_auto(
     source_url = query
 
     with sync_playwright() as playwright:
-        context = _launch_context(playwright)
+        context = _launch_context(playwright, profile_mode=profile_mode)
         page = context.new_page()
 
         try:
@@ -627,13 +719,13 @@ def fetch_auto(
                         page.goto(url, wait_until="domcontentloaded", timeout=30000)
                         page.wait_for_timeout(2200)
                     except PlaywrightTimeoutError as exc:
-                        blocked_reason = f"video page load timeout: {url} / {exc}"
-                        break
+                        fetch_warnings.append(f"video page load timeout: {url} / {exc}")
+                        continue
 
-                    blocked_reason = _detect_blocked_page(page, retries=1)
-                    if blocked_reason:
-                        blocked_reason = f"{blocked_reason} / url={url}"
-                        break
+                    page_blocked_reason = _detect_blocked_page(page, retries=1)
+                    if page_blocked_reason:
+                        fetch_warnings.append(f"{page_blocked_reason} / url={url}")
+                        continue
 
                     item = _parse_tiktok_page(page, url, input_value)
                     item["view_count_num"] = parse_number(item.get("view_count"))
@@ -659,6 +751,9 @@ def fetch_auto(
         except Exception as exc:
             save_error = str(exc)
 
+    if not blocked_reason and not products and fetch_warnings:
+        blocked_reason = fetch_warnings[0]
+
     return {
         "keyword": input_value,
         "input_value": input_value,
@@ -672,7 +767,10 @@ def fetch_auto(
         "sheet_name": worksheet_name,
         "save_error": save_error,
         "blocked_reason": blocked_reason,
+        "fetch_warning_count": len(fetch_warnings),
+        "fetch_warning_samples": fetch_warnings[:5],
         "source_url": source_url,
+        "profile_mode": profile_mode,
         "login_state": session_info["login_state"],
         "login_state_before": session_info["login_state_before"],
         "login_state_reason": session_info["login_state_reason"],

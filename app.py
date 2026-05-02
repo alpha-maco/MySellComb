@@ -18,7 +18,6 @@ FETCHER_IMPORTS = {
 AVAILABLE_SOURCES = ["coupang", "naver", "tiktok"]
 
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-DASHBOARD_URL = "http://127.0.0.1:5000/"
 
 HTTP_LOGS = []
 MAX_LOGS = 300
@@ -324,6 +323,7 @@ def fetch_tiktok_auto():
     data = request.get_json(silent=True) or {}
     input_mode = str(data.get("input_mode", "keyword")).strip().lower() or "keyword"
     save_mode = str(data.get("save_mode", "overwrite")).strip().lower() or "overwrite"
+    profile_mode = str(data.get("profile_mode", "default")).strip().lower() or "default"
     input_value = str(
         data.get("input_value")
         or data.get("keyword")
@@ -338,23 +338,32 @@ def fetch_tiktok_auto():
     if save_mode not in {"overwrite", "append"}:
         return jsonify({"success": False, "error": "save_mode must be 'overwrite' or 'append'."}), 400
 
+    if profile_mode not in {"default", "automation"}:
+        return jsonify({"success": False, "error": "profile_mode must be 'default' or 'automation'."}), 400
+
     if not input_value:
         field_label = "keyword" if input_mode == "keyword" else "video_url"
         return jsonify({"success": False, "error": f"{field_label} is required for TikTok auto fetch."}), 400
 
     add_http_log(
-        f"[NOTICE] [FETCH] tiktok auto fetch started / mode={input_mode} / input={input_value} / save_target={limit} / save_mode={save_mode}"
+        f"[NOTICE] [FETCH] tiktok auto fetch started / mode={input_mode} / input={input_value} / save_target={limit} / save_mode={save_mode} / profile_mode={profile_mode}"
     )
 
     try:
         tiktok_auto_fetch = getattr(import_module("crawler.tiktok_fetcher"), "fetch_auto")
-        result = tiktok_auto_fetch(query=input_value, limit=limit, input_mode=input_mode, save_mode=save_mode)
+        result = tiktok_auto_fetch(
+            query=input_value,
+            limit=limit,
+            input_mode=input_mode,
+            save_mode=save_mode,
+            profile_mode=profile_mode,
+        )
     except ModuleNotFoundError as exc:
         update_result_state(
             "tiktok",
             0,
             error=str(exc),
-            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "limit": limit, "mode": "auto"},
+            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "profile_mode": profile_mode, "limit": limit, "mode": "auto"},
         )
         add_http_log(f"[ERROR] [FETCH] tiktok dependency missing: {exc}")
         return jsonify(
@@ -369,7 +378,7 @@ def fetch_tiktok_auto():
             "tiktok",
             0,
             error=str(exc),
-            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "limit": limit, "mode": "auto"},
+            details={"input_value": input_value, "input_mode": input_mode, "save_mode": save_mode, "profile_mode": profile_mode, "limit": limit, "mode": "auto"},
         )
         add_http_log(f"[ERROR] [FETCH] tiktok auto fetch failed: {exc}")
         return jsonify({"success": False, "source": "tiktok_auto", "error": str(exc)}), 500
@@ -380,6 +389,7 @@ def fetch_tiktok_auto():
         "input_value": result["input_value"],
         "input_mode": result["input_mode"],
         "save_mode": result["save_mode"],
+        "profile_mode": result.get("profile_mode", profile_mode),
         "limit": limit,
         "save_target_count": result["save_target_count"],
         "discovery_limit": result["discovery_limit"],
@@ -435,6 +445,7 @@ def fetch_tiktok_auto():
                 "input_value": result["input_value"],
                 "input_mode": result["input_mode"],
                 "save_mode": result["save_mode"],
+                "profile_mode": result.get("profile_mode", profile_mode),
                 "save_target_count": result["save_target_count"],
                 "discovered_count": result["discovered_count"],
                 "saved_count": result["saved_count"],
@@ -465,6 +476,7 @@ def fetch_tiktok_auto():
             "input_value": result["input_value"],
             "input_mode": result["input_mode"],
             "save_mode": result["save_mode"],
+            "profile_mode": result.get("profile_mode", profile_mode),
             "save_target_count": result["save_target_count"],
             "discovery_limit": result["discovery_limit"],
             "count": len(result["products"]),

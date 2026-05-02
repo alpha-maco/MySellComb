@@ -1,10 +1,10 @@
-from pathlib import Path
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
+from .runtime_paths import get_browser_profile_dir
 from .saver import save_to_sheet
 
 SEARCH_QUERY = "여행용 파우치"
-PROFILE_DIR = Path(__file__).resolve().parent / "browser_profile" / "coupang_chrome"
+PROFILE_DIR = get_browser_profile_dir("coupang_chrome")
 
 
 def _safe_get_page_text(page):

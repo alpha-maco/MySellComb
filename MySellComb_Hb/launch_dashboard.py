@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
@@ -5,8 +7,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-STDOUT_LOG = PROJECT_ROOT / "live_server_stdout.log"
-STDERR_LOG = PROJECT_ROOT / "live_server_stderr.log"
+STDOUT_LOG = PROJECT_ROOT / "hb_server_stdout.log"
+STDERR_LOG = PROJECT_ROOT / "hb_server_stderr.log"
 
 
 def build_env() -> dict[str, str]:
@@ -20,11 +22,12 @@ def build_env() -> dict[str, str]:
 
     env["PATH"] = path_value
     env.setdefault("MYSELLCOMB_HOST", "127.0.0.1")
-    env.setdefault("MYSELLCOMB_PORT", "5000")
+    env.setdefault("MYSELLCOMB_PORT", "5010")
     env.setdefault("MYSELLCOMB_DEBUG", "0")
     env.setdefault("MYSELLCOMB_USE_RELOADER", "0")
     env.setdefault("MYSELLCOMB_OPEN_BROWSER", "0")
     env.setdefault("MYSELLCOMB_BROWSER_PROFILE_ROOT", str(PROJECT_ROOT / "crawler" / "browser_profile"))
+    env.setdefault("TIKTOK_WORKSHEET_NAME", "TikTok_Hb")
     return env
 
 
