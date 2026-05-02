@@ -15,6 +15,8 @@
             <div id="logConsole" class="log-console"></div>
         </aside>
 
+        <div id="panelResizer" class="panel-resizer" role="separator" aria-label="Resize panels" aria-orientation="vertical"></div>
+
         <main class="dashboard-panel">
             <div class="top-bar">
                 <div>
@@ -24,21 +26,7 @@
             </div>
 
             <section class="control-card">
-                <div class="control-row two-columns">
-                    <div class="input-group">
-                        <label for="intervalSelect">Repeat interval</label>
-                        <select id="intervalSelect">
-                            <option value="60">1 minute</option>
-                            <option value="300">5 minutes</option>
-                            <option value="600">10 minutes</option>
-                            <option value="1800">30 minutes</option>
-                            <option value="3600" selected>1 hour</option>
-                            <option value="21600">6 hours</option>
-                            <option value="43200">12 hours</option>
-                            <option value="86400">24 hours</option>
-                        </select>
-                    </div>
-
+                <div class="control-row">
                     <div id="tiktokControls" class="tiktok-config hidden">
                         <div class="input-group input-group-wide">
                             <label for="tiktokQueryInput">TikTok keyword / video URL</label>
@@ -47,7 +35,15 @@
                                     <option value="keyword" selected>Keyword</option>
                                     <option value="url">Video URL</option>
                                 </select>
-                                <input id="tiktokQueryInput" type="text" placeholder="e.g. camping gear">
+                                <input id="tiktokQueryInput" type="text" placeholder="e.g. camping gear" onkeydown="handleTiktokQueryInputKeydown(event)">
+                                <button id="tiktokKeywordAddBtn" type="button" class="combo-action-btn" onclick="addTiktokKeywordSlot()">Add slot</button>
+                            </div>
+                            <div id="tiktokKeywordSlotBuilder" class="keyword-slot-builder">
+                                <div class="keyword-slot-header">
+                                    <span class="keyword-slot-title">Keyword slots</span>
+                                    <span class="keyword-slot-caption">Add multiple keywords and Run fetch now will execute them in order.</span>
+                                </div>
+                                <div id="tiktokKeywordSlots" class="keyword-slot-list"></div>
                             </div>
                         </div>
                         <div class="input-group">
@@ -65,38 +61,40 @@
                             <div class="batch-card-header">
                                 <div>
                                     <span class="batch-card-eyebrow">Live TikTok Daily Batch (KST)</span>
-                                    <h3>Weekday / Weekend Time Slots</h3>
-                                    <p>Fixed daily windows are 03:00, 04:00, 05:00, 06:00, and 07:00 KST. Choose which slots remain active for weekdays and weekends.</p>
-                                </div>
-                                <div class="batch-card-actions">
-                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekday', true)">Weekday all</button>
-                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekday', false)">Weekday clear</button>
-                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekend', true)">Weekend all</button>
-                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="applyTiktokBatchPreset('weekend', false)">Weekend clear</button>
+                                    <h3>Compact Batch Slot Editor</h3>
+                                    <p>Choose one day-type and one hour slot, then add it to the Live schedule. All 24 hours are available, and the default active slots stay at 03:00 to 07:00 KST.</p>
                                 </div>
                             </div>
-                            <div class="batch-matrix">
-                                <div class="batch-matrix-row">
-                                    <div class="batch-matrix-label">Weekdays</div>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="03:00" onchange="handleTiktokBatchSlotChange()"><span>03:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="04:00" onchange="handleTiktokBatchSlotChange()"><span>04:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="05:00" onchange="handleTiktokBatchSlotChange()"><span>05:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="06:00" onchange="handleTiktokBatchSlotChange()"><span>06:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekday" value="07:00" onchange="handleTiktokBatchSlotChange()"><span>07:00</span></label>
+                            <div class="batch-select-row">
+                                <div class="input-group">
+                                    <label for="tiktokBatchDayType">Day type</label>
+                                    <select id="tiktokBatchDayType">
+                                        <option value="weekday" selected>Weekday</option>
+                                        <option value="weekend">Weekend</option>
+                                    </select>
                                 </div>
-                                <div class="batch-matrix-row">
-                                    <div class="batch-matrix-label">Weekend</div>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="03:00" onchange="handleTiktokBatchSlotChange()"><span>03:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="04:00" onchange="handleTiktokBatchSlotChange()"><span>04:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="05:00" onchange="handleTiktokBatchSlotChange()"><span>05:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="06:00" onchange="handleTiktokBatchSlotChange()"><span>06:00</span></label>
-                                    <label class="batch-slot"><input type="checkbox" data-day-type="weekend" value="07:00" onchange="handleTiktokBatchSlotChange()"><span>07:00</span></label>
+                                <div class="input-group">
+                                    <label for="tiktokBatchHour">Hour slot (KST)</label>
+                                    <select id="tiktokBatchHour"></select>
+                                </div>
+                                <div class="batch-inline-actions">
+                                    <button type="button" class="action-btn primary batch-mini-btn" onclick="addTiktokBatchSlot()">Add slot</button>
+                                    <button type="button" class="action-btn quiet batch-mini-btn" onclick="resetTiktokBatchScheduleToDefault()">Reset default</button>
                                 </div>
                             </div>
                             <div class="batch-card-footer">
+                                <div class="batch-selected-groups">
+                                    <div class="batch-selected-group">
+                                        <div class="batch-selected-label">Weekdays</div>
+                                        <div id="tiktokBatchWeekdayChips" class="batch-chip-row"></div>
+                                    </div>
+                                    <div class="batch-selected-group">
+                                        <div class="batch-selected-label">Weekend</div>
+                                        <div id="tiktokBatchWeekendChips" class="batch-chip-row"></div>
+                                    </div>
+                                </div>
                                 <div class="batch-card-buttons">
                                     <button type="button" class="action-btn primary" onclick="saveTiktokBatchSchedule()">Save TikTok batch schedule</button>
-                                    <button type="button" class="action-btn quiet" onclick="resetTiktokBatchScheduleToDefault()">Reset to daily default</button>
                                 </div>
                                 <div id="tiktokBatchScheduleSummary" class="batch-schedule-summary">Loading TikTok batch schedule...</div>
                             </div>
@@ -147,7 +145,9 @@
     <script>
         let selectedSource = "coupang";
         let showPollingLogs = false;
-        const TIKTOK_BATCH_SLOTS = ["03:00", "04:00", "05:00", "06:00", "07:00"];
+        const TIKTOK_BATCH_SLOTS = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, "0")}:00`);
+        let tiktokBatchScheduleState = null;
+        let tiktokKeywordSlots = [];
 
         function selectSource(source) {
             selectedSource = source;
@@ -166,16 +166,92 @@
             document.getElementById("tiktokControls").classList.toggle("hidden", source !== "tiktok");
             document.getElementById("resultInfo").textContent =
                 source === "tiktok"
-                    ? "TikTok auto mode selected. Choose keyword or video URL, set the final Google Sheet save count, choose overwrite or append for today's same-keyword rows, and manage Live batch slots below in KST. Logged-out session will be enforced."
+                    ? "TikTok auto mode selected. Choose keyword or video URL, set the final Google Sheet save count, choose overwrite or append for today's same-keyword rows, and manage compact Live batch slots below in KST. Logged-out session will be enforced."
                     : `Selected source: ${source}`;
+        }
+
+        function initializePanelResizer() {
+            const layout = document.querySelector(".layout");
+            const resizer = document.getElementById("panelResizer");
+            if (!layout || !resizer) return;
+
+            const storageKey = "mysellcombLogPanelWidth";
+            const minWidth = 320;
+            const minRightWidth = 420;
+            let lastAppliedWidth = null;
+
+            const applyWidth = (rawWidth, persist = false) => {
+                if (window.innerWidth <= 1200) {
+                    layout.style.removeProperty("--log-panel-width");
+                    if (persist) {
+                        localStorage.removeItem(storageKey);
+                    }
+                    lastAppliedWidth = null;
+                    return;
+                }
+
+                const maxWidth = Math.max(minWidth, window.innerWidth - minRightWidth);
+                const clamped = Math.min(Math.max(rawWidth, minWidth), maxWidth);
+                layout.style.setProperty("--log-panel-width", `${clamped}px`);
+                lastAppliedWidth = clamped;
+                if (persist) {
+                    localStorage.setItem(storageKey, String(clamped));
+                }
+            };
+
+            const storedWidth = Number(localStorage.getItem(storageKey));
+            if (Number.isFinite(storedWidth) && storedWidth > 0) {
+                applyWidth(storedWidth);
+            }
+
+            let isDragging = false;
+
+            const handlePointerMove = (event) => {
+                if (!isDragging) return;
+                applyWidth(event.clientX);
+            };
+
+            const stopDragging = () => {
+                if (!isDragging) return;
+                isDragging = false;
+                document.body.classList.remove("is-resizing-panels");
+                window.removeEventListener("pointermove", handlePointerMove);
+                window.removeEventListener("pointerup", stopDragging);
+                const currentWidth = parseFloat(getComputedStyle(layout).getPropertyValue("--log-panel-width"));
+                if (Number.isFinite(currentWidth)) {
+                    applyWidth(currentWidth, true);
+                }
+            };
+
+            resizer.addEventListener("pointerdown", (event) => {
+                if (window.innerWidth <= 1200) return;
+                isDragging = true;
+                document.body.classList.add("is-resizing-panels");
+                resizer.setPointerCapture?.(event.pointerId);
+                window.addEventListener("pointermove", handlePointerMove);
+                window.addEventListener("pointerup", stopDragging, { once: true });
+            });
+
+            window.addEventListener("resize", () => {
+                if (Number.isFinite(lastAppliedWidth) && lastAppliedWidth > 0) {
+                    applyWidth(lastAppliedWidth, true);
+                } else {
+                    const savedWidth = Number(localStorage.getItem(storageKey));
+                    if (Number.isFinite(savedWidth) && savedWidth > 0) {
+                        applyWidth(savedWidth);
+                        return;
+                    }
+                    applyWidth(storedWidth);
+                }
+            });
         }
 
         function getDefaultTiktokBatchSchedule() {
             return {
                 timezone: "Asia/Seoul",
                 available_slots: [...TIKTOK_BATCH_SLOTS],
-                weekday: [...TIKTOK_BATCH_SLOTS],
-                weekend: [...TIKTOK_BATCH_SLOTS]
+                weekday: ["03:00", "04:00", "05:00", "06:00", "07:00"],
+                weekend: ["03:00", "04:00", "05:00", "06:00", "07:00"]
             };
         }
 
@@ -197,33 +273,29 @@
             };
         }
 
-        function getTiktokBatchCheckboxes(dayType) {
-            return Array.from(document.querySelectorAll(`input[data-day-type="${dayType}"]`));
+        function populateTiktokBatchHourOptions() {
+            const hourSelect = document.getElementById("tiktokBatchHour");
+            hourSelect.innerHTML = "";
+
+            for (const slot of TIKTOK_BATCH_SLOTS) {
+                const option = document.createElement("option");
+                option.value = slot;
+                option.textContent = slot;
+                hourSelect.appendChild(option);
+            }
+
+            hourSelect.value = "03:00";
         }
 
         function applyTiktokBatchScheduleToUI(schedule) {
             const normalized = normalizeTiktokBatchSchedule(schedule);
-
-            for (const dayType of ["weekday", "weekend"]) {
-                const selected = new Set(normalized[dayType]);
-                for (const checkbox of getTiktokBatchCheckboxes(dayType)) {
-                    checkbox.checked = selected.has(checkbox.value);
-                }
-            }
-
+            tiktokBatchScheduleState = normalized;
+            renderTiktokBatchSelectedSlots();
             updateTiktokBatchScheduleSummary(normalized);
         }
 
         function readTiktokBatchScheduleFromUI() {
-            const buildDay = (dayType) =>
-                getTiktokBatchCheckboxes(dayType)
-                    .filter((checkbox) => checkbox.checked)
-                    .map((checkbox) => checkbox.value);
-
-            return normalizeTiktokBatchSchedule({
-                weekday: buildDay("weekday"),
-                weekend: buildDay("weekend")
-            });
+            return normalizeTiktokBatchSchedule(tiktokBatchScheduleState || getDefaultTiktokBatchSchedule());
         }
 
         function formatTiktokBatchSummaryLine(label, values) {
@@ -239,15 +311,55 @@
                 `timezone=${normalized.timezone}`;
         }
 
-        function handleTiktokBatchSlotChange() {
-            updateTiktokBatchScheduleSummary();
+        function renderTiktokBatchSelectedSlots() {
+            const normalized = readTiktokBatchScheduleFromUI();
+            const targets = {
+                weekday: document.getElementById("tiktokBatchWeekdayChips"),
+                weekend: document.getElementById("tiktokBatchWeekendChips")
+            };
+
+            for (const dayType of ["weekday", "weekend"]) {
+                const container = targets[dayType];
+                container.innerHTML = "";
+
+                const values = normalized[dayType];
+                if (!values.length) {
+                    const empty = document.createElement("span");
+                    empty.className = "batch-chip-empty";
+                    empty.textContent = "No slots selected";
+                    container.appendChild(empty);
+                    continue;
+                }
+
+                for (const slot of values) {
+                    const chip = document.createElement("button");
+                    chip.type = "button";
+                    chip.className = "batch-chip";
+                    chip.innerHTML = `<span>${slot}</span><strong>&times;</strong>`;
+                    chip.onclick = () => removeTiktokBatchSlot(dayType, slot);
+                    container.appendChild(chip);
+                }
+            }
         }
 
-        function applyTiktokBatchPreset(dayType, enabled) {
-            for (const checkbox of getTiktokBatchCheckboxes(dayType)) {
-                checkbox.checked = enabled;
+        function addTiktokBatchSlot() {
+            const dayType = document.getElementById("tiktokBatchDayType").value;
+            const slot = document.getElementById("tiktokBatchHour").value;
+            const current = readTiktokBatchScheduleFromUI();
+
+            if (!current[dayType].includes(slot)) {
+                current[dayType] = [...current[dayType], slot].sort();
             }
-            updateTiktokBatchScheduleSummary();
+
+            applyTiktokBatchScheduleToUI(current);
+            document.getElementById("resultInfo").textContent = `Added ${slot} to ${dayType} TikTok batch slots. Save to persist it.`;
+        }
+
+        function removeTiktokBatchSlot(dayType, slot) {
+            const current = readTiktokBatchScheduleFromUI();
+            current[dayType] = current[dayType].filter((value) => value !== slot);
+            applyTiktokBatchScheduleToUI(current);
+            document.getElementById("resultInfo").textContent = `Removed ${slot} from ${dayType} TikTok batch slots. Save to persist it.`;
         }
 
         function resetTiktokBatchScheduleToDefault() {
@@ -324,13 +436,160 @@
         function updateTiktokInputModeUI() {
             const mode = document.getElementById("tiktokInputMode").value;
             const input = document.getElementById("tiktokQueryInput");
+            const addButton = document.getElementById("tiktokKeywordAddBtn");
+            const slotBuilder = document.getElementById("tiktokKeywordSlotBuilder");
 
             if (mode === "url") {
                 input.placeholder = "https://www.tiktok.com/@user/video/1234567890";
+                addButton.classList.add("hidden");
+                slotBuilder.classList.add("hidden");
                 return;
             }
 
             input.placeholder = "e.g. camping gear";
+            addButton.classList.remove("hidden");
+            slotBuilder.classList.remove("hidden");
+            renderTiktokKeywordSlots();
+        }
+
+        function handleTiktokQueryInputKeydown(event) {
+            if (event.key !== "Enter") {
+                return;
+            }
+
+            const mode = document.getElementById("tiktokInputMode").value;
+            if (mode !== "keyword") {
+                return;
+            }
+
+            event.preventDefault();
+            addTiktokKeywordSlot();
+        }
+
+        function normalizeTiktokKeywordValue(value) {
+            return String(value || "").trim();
+        }
+
+        function renderTiktokKeywordSlots() {
+            const slotContainer = document.getElementById("tiktokKeywordSlots");
+            slotContainer.innerHTML = "";
+
+            if (!tiktokKeywordSlots.length) {
+                const empty = document.createElement("span");
+                empty.className = "keyword-slot-empty";
+                empty.textContent = "No keyword slots yet";
+                slotContainer.appendChild(empty);
+                return;
+            }
+
+            for (const keyword of tiktokKeywordSlots) {
+                const chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "keyword-slot-chip";
+                chip.innerHTML = `<span>${escapeHtml(keyword)}</span><strong>&times;</strong>`;
+                chip.onclick = () => removeTiktokKeywordSlot(keyword);
+                slotContainer.appendChild(chip);
+            }
+        }
+
+        function addTiktokKeywordSlot(keywordValue = null) {
+            const input = document.getElementById("tiktokQueryInput");
+            const keyword = normalizeTiktokKeywordValue(keywordValue ?? input.value);
+
+            if (!keyword) {
+                document.getElementById("resultInfo").textContent = "Enter a TikTok keyword before adding a slot.";
+                return false;
+            }
+
+            if (!tiktokKeywordSlots.includes(keyword)) {
+                tiktokKeywordSlots = [...tiktokKeywordSlots, keyword];
+                renderTiktokKeywordSlots();
+            }
+
+            input.value = "";
+            document.getElementById("resultInfo").textContent = `Added keyword slot: ${keyword}`;
+            return true;
+        }
+
+        function removeTiktokKeywordSlot(keyword) {
+            tiktokKeywordSlots = tiktokKeywordSlots.filter((value) => value !== keyword);
+            renderTiktokKeywordSlots();
+            document.getElementById("resultInfo").textContent = `Removed keyword slot: ${keyword}`;
+        }
+
+        function getTiktokKeywordRunList() {
+            const input = document.getElementById("tiktokQueryInput");
+            const currentKeyword = normalizeTiktokKeywordValue(input.value);
+            const keywords = [...tiktokKeywordSlots];
+
+            if (currentKeyword && !keywords.includes(currentKeyword)) {
+                keywords.push(currentKeyword);
+            }
+
+            return keywords;
+        }
+
+        async function requestTiktokAutoFetch(payload) {
+            const response = await fetch("/fetch/tiktok/auto", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            return { response, data };
+        }
+
+        async function runTiktokKeywordBatch(keywords, limit, saveMode) {
+            const resultInfo = document.getElementById("resultInfo");
+            const summaries = [];
+            let lastProducts = [];
+            let failureCount = 0;
+
+            tiktokKeywordSlots = [...keywords];
+            renderTiktokKeywordSlots();
+
+            for (let index = 0; index < keywords.length; index += 1) {
+                const keyword = keywords[index];
+                resultInfo.textContent =
+                    `TikTok auto fetch in progress / keyword ${index + 1} of ${keywords.length} / input=${keyword} / save_target=${limit} / save_mode=${saveMode} / session=checking`;
+
+                try {
+                    const { response, data } = await requestTiktokAutoFetch({
+                        input_mode: "keyword",
+                        input_value: keyword,
+                        limit,
+                        save_mode: saveMode
+                    });
+
+                    const sessionSuffix = formatTiktokSessionSuffix(data);
+                    if (!response.ok || !data.success) {
+                        failureCount += 1;
+                        summaries.push(`${keyword}: failed${data.error ? ` (${data.error})` : ""}`);
+                        if (data.products) {
+                            lastProducts = data.products;
+                        }
+                        resultInfo.textContent =
+                            `TikTok keyword batch hit an error / input=${keyword}${sessionSuffix}`;
+                        continue;
+                    }
+
+                    lastProducts = data.products || [];
+                    summaries.push(
+                        `${keyword}: discovered=${data.discovered_count} / saved=${data.saved_count}${data.save_error ? ` / save_error=${data.save_error}` : ""}`
+                    );
+                } catch (error) {
+                    failureCount += 1;
+                    summaries.push(`${keyword}: failed (${error.message})`);
+                }
+            }
+
+            renderProducts("tiktok", lastProducts);
+            await loadLogs();
+            await loadCrawlStatus();
+
+            const successCount = keywords.length - failureCount;
+            resultInfo.textContent =
+                `TikTok keyword batch finished / success=${successCount} / failed=${failureCount} / ${summaries.join(" | ")}`;
         }
 
         function formatTiktokSessionSuffix(data) {
@@ -423,28 +682,36 @@
 
         async function runTiktokAutoFetch() {
             const inputMode = document.getElementById("tiktokInputMode").value;
-            const inputValue = document.getElementById("tiktokQueryInput").value.trim();
             const limit = Number(document.getElementById("tiktokLimit").value || 10);
             const saveMode = document.getElementById("tiktokSaveMode").value;
             const resultInfo = document.getElementById("resultInfo");
 
+            if (inputMode === "keyword") {
+                const keywords = getTiktokKeywordRunList();
+
+                if (!keywords.length) {
+                    resultInfo.textContent = "TikTok keyword is required.";
+                    return;
+                }
+
+                return runTiktokKeywordBatch(keywords, limit, saveMode);
+            }
+
+            const inputValue = document.getElementById("tiktokQueryInput").value.trim();
             if (!inputValue) {
-                resultInfo.textContent = inputMode === "url"
-                    ? "TikTok video URL is required."
-                    : "TikTok keyword is required.";
+                resultInfo.textContent = "TikTok video URL is required.";
                 return;
             }
 
             resultInfo.textContent = `TikTok auto fetch in progress / mode=${inputMode} / input=${inputValue} / save_target=${limit} / save_mode=${saveMode} / session=checking`;
 
             try {
-                const response = await fetch("/fetch/tiktok/auto", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ input_mode: inputMode, input_value: inputValue, limit, save_mode: saveMode })
+                const { response, data } = await requestTiktokAutoFetch({
+                    input_mode: inputMode,
+                    input_value: inputValue,
+                    limit,
+                    save_mode: saveMode
                 });
-
-                const data = await response.json();
                 const sessionSuffix = formatTiktokSessionSuffix(data);
 
                 if (!response.ok || !data.success) {
@@ -475,12 +742,39 @@
         }
 
         async function startCrawl(force = false) {
-            const intervalSeconds = Number(document.getElementById("intervalSelect").value);
+            const intervalSelect = document.getElementById("intervalSelect");
+            const intervalSeconds = intervalSelect ? Number(intervalSelect.value) : 3600;
             const resultInfo = document.getElementById("resultInfo");
+            const payload = {
+                source: selectedSource,
+                interval_seconds: intervalSeconds,
+                force
+            };
 
             if (selectedSource === "tiktok") {
-                resultInfo.textContent = "TikTok repeat crawl is not enabled. Use 'Run fetch now' with keyword input.";
-                return;
+                const inputMode = document.getElementById("tiktokInputMode").value;
+                const saveMode = document.getElementById("tiktokSaveMode").value;
+                const limit = Number(document.getElementById("tiktokLimit").value || 10);
+                payload.input_mode = inputMode;
+                payload.save_mode = saveMode;
+                payload.limit = limit;
+                payload.schedule = readTiktokBatchScheduleFromUI();
+
+                if (inputMode === "keyword") {
+                    const keywords = getTiktokKeywordRunList();
+                    if (!keywords.length) {
+                        resultInfo.textContent = "Add at least one TikTok keyword slot before starting repeat crawl.";
+                        return;
+                    }
+                    payload.keywords = keywords;
+                } else {
+                    const inputValue = document.getElementById("tiktokQueryInput").value.trim();
+                    if (!inputValue) {
+                        resultInfo.textContent = "TikTok video URL is required before starting repeat crawl.";
+                        return;
+                    }
+                    payload.input_value = inputValue;
+                }
             }
 
             resultInfo.textContent = `${selectedSource} repeat crawl start requested...`;
@@ -489,11 +783,7 @@
                 const response = await fetch("/crawl/start", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        source: selectedSource,
-                        interval_seconds: intervalSeconds,
-                        force
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
@@ -600,8 +890,19 @@
                 const statusBox = document.getElementById("crawlStatus");
 
                 if (data.is_running) {
-                    statusBox.textContent =
-                        `Running / source=${data.source} / interval=${data.interval_seconds}s / started=${data.last_started_at || "-"}`;
+                    if (data.source === "tiktok" && data.mode === "batch_schedule") {
+                        const activeConfig = data.active_config || {};
+                        const inputValues = Array.isArray(activeConfig.input_values)
+                            ? activeConfig.input_values.join(", ")
+                            : "-";
+                        statusBox.textContent =
+                            `Running / source=tiktok / mode=batch_schedule / next_run=${data.next_run_at_kst || "-"} / ` +
+                            `keywords=${inputValues || "-"} / save_target=${activeConfig.limit ?? "-"} / save_mode=${activeConfig.save_mode || "-"} / ` +
+                            `last_slot=${data.last_schedule_slot || "-"} / started=${data.last_started_at || "-"}`;
+                    } else {
+                        statusBox.textContent =
+                            `Running / source=${data.source} / interval=${data.interval_seconds}s / started=${data.last_started_at || "-"}`;
+                    }
                     statusBox.className = "status-box running";
                     return;
                 }
@@ -636,6 +937,9 @@
 
         selectSource("coupang");
         updateTiktokInputModeUI();
+        initializePanelResizer();
+        populateTiktokBatchHourOptions();
+        renderTiktokKeywordSlots();
         refreshPollingLogButton();
         loadTiktokBatchSchedule();
         loadLogs();

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySellComb Hb TikTok Schedule Test</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background: #eef4fb;
+            color: #18324b;
+        }
+
+        .hb-test-shell {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 28px 24px 40px;
+        }
+
+        .hb-test-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .hb-test-header h1 {
+            margin: 0 0 8px;
+            font-size: 40px;
+            line-height: 1.05;
+        }
+
+        .hb-test-header p {
+            margin: 0;
+            color: #5e7187;
+            max-width: 720px;
+        }
+
+        .hb-clock-card {
+            min-width: 260px;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #0f1722 0%, #121d2a 100%);
+            color: #f2f8ff;
+            box-shadow: 0 14px 34px rgba(16, 30, 45, 0.22);
+        }
+
+        .hb-clock-card .eyebrow {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            color: #86c8ff;
+            text-transform: uppercase;
+        }
+
+        .hb-clock-time {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .hb-test-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+            gap: 18px;
+        }
+
+        .hb-test-card {
+            padding: 22px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(196, 214, 232, 0.8);
+            box-shadow: 0 14px 32px rgba(82, 112, 145, 0.12);
+        }
+
+        .hb-test-card h2 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            line-height: 1.15;
+        }
+
+        .hb-test-card p {
+            margin: 0 0 18px;
+            color: #5f7185;
+        }
+
+        .hb-field-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .hb-field-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        .hb-slot-builder {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 18px;
+            background: #f7fbff;
+            border: 1px solid #d7e5f3;
+            margin-top: 12px;
+        }
+
+        .hb-slot-controls {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .hb-quick-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .hb-slot-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 40px;
+        }
+
+        .hb-slot-chip,
+        .hb-slot-chip-empty {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 38px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .hb-slot-chip {
+            border: 1px solid #bfd6eb;
+            background: #ffffff;
+            color: #184670;
+            cursor: pointer;
+        }
+
+        .hb-slot-chip strong {
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .hb-slot-chip-empty {
+            border: 1px dashed #cad8e6;
+            background: #fbfdff;
+            color: #718396;
+        }
+
+        .hb-result-box {
+            margin-top: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: #f8fbff;
+            border: 1px solid #d5e4f2;
+            font-size: 13px;
+            font-weight: 700;
+            color: #21435f;
+            min-height: 48px;
+        }
+
+        .hb-meta-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .hb-meta-item {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: #f7fbff;
+            border: 1px solid #d7e5f3;
+        }
+
+        .hb-meta-item strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #5d7288;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .hb-log-box {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 18px;
+            background: #0b1017;
+            color: #8effa7;
+            min-height: 280px;
+            max-height: 480px;
+            overflow: auto;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 980px) {
+            .hb-test-grid,
+            .hb-field-grid,
+            .hb-slot-controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hb-test-shell">
+        <div class="hb-test-header">
+            <div>
+                <h1>Hb TikTok Minute Test</h1>
+                <p>Hb서버 전용 분 단위 테스트 페이지입니다. Live 배치 스케줄과 분리해서, KST 기준 빠른 슬롯을 추가하고 `Start repeat crawl` 동작을 직접 검증할 수 있습니다.</p>
+            </div>
+            <div class="hb-clock-card">
+                <span class="eyebrow">Current KST</span>
+                <div id="hbClockTime" class="hb-clock-time">--:--:--</div>
+            </div>
+        </div>
+
+        <div class="hb-test-grid">
+            <section class="hb-test-card">
+                <h2>Arm Minute Schedule</h2>
+                <p>키워드 또는 URL 입력과 분 단위 슬롯을 조합해서 Hb repeat crawl을 arm 합니다. 슬롯 시간까지는 대기만 하고, 해당 분에만 실제 fetch를 실행합니다.</p>
+
+                <div class="hb-field-grid">
+                    <div class="input-group">
+                        <label for="hbInputMode">Input mode</label>
+                        <select id="hbInputMode" onchange="updateHbInputModeUI()">
+                            <option value="keyword" selected>Keyword</option>
+                            <option value="url">Video URL</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="hbLimit">Google Sheet save count</label>
+                        <input id="hbLimit" type="number" min="1" max="30" value="2">
+                    </div>
+                </div>
+
+                <div id="hbKeywordWrap" class="input-group" style="margin-top: 14px;">
+                    <label for="hbKeywords">Keyword slots (one per line)</label>
+                    <textarea id="hbKeywords" rows="5" placeholder="다이소&#10;어린이날"></textarea>
+                </div>
+
+                <div id="hbUrlWrap" class="input-group hidden" style="margin-top: 14px;">
+                    <label for="hbUrlInput">TikTok video URL</label>
+                    <input id="hbUrlInput" type="text" placeholder="https://www.tiktok.com/@user/video/1234567890">
+                </div>
+
+                <div class="hb-field-grid" style="margin-top: 14px;">
+                    <div class="input-group">
+                        <label for="hbSaveMode">Same-day save mode</label>
+                        <select id="hbSaveMode">
+                            <option value="overwrite" selected>Overwrite same keyword today</option>
+                            <option value="append">Append today</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="hbProfileMode">Profile mode</label>
+                        <select id="hbProfileMode">
+                            <option value="automation" selected>Automation</option>
+                            <option value="default">Default</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="hb-slot-builder">
+                    <div class="hb-slot-controls">
+                        <div class="input-group">
+                            <label for="hbHourSelect">Hour (KST)</label>
+                            <select id="hbHourSelect"></select>
+                        </div>
+                        <div class="input-group">
+                            <label for="hbMinuteSelect">Minute</label>
+                            <select id="hbMinuteSelect"></select>
+                        </div>
+                        <button type="button" class="action-btn primary" onclick="addHbSlotFromSelects()">Add slot</button>
+                    </div>
+
+                    <div class="hb-quick-buttons">
+                        <button type="button" class="action-btn quiet" onclick="addQuickOffsetSlot(1)">+1 min</button>
+                        <button type="button" class="action-btn quiet" onclick="addQuickOffsetSlot(2)">+2 min</button>
+                        <button type="button" class="action-btn quiet" onclick="addQuickOffsetSlot(5)">+5 min</button>
+                        <button type="button" class="action-btn quiet" onclick="clearHbSlots()">Clear slots</button>
+                    </div>
+
+                    <div>
+                        <label>Minute test slots (KST)</label>
+                        <div id="hbSlotChipRow" class="hb-slot-chip-row"></div>
+                    </div>
+                </div>
+
+                <div class="control-box" style="margin-top: 18px;">
+                    <button type="button" class="action-btn primary" onclick="armHbMinuteTest()">Arm minute test</button>
+                    <button type="button" class="action-btn danger" onclick="stopHbMinuteTest()">Stop repeat crawl</button>
+                    <button type="button" class="action-btn neutral" onclick="refreshHbStatus()">Refresh status</button>
+                    <button type="button" class="action-btn quiet" onclick="refreshHbLogs()">Refresh logs</button>
+                </div>
+
+                <div id="hbResultBox" class="hb-result-box">Ready. Add at least one minute slot and arm the test.</div>
+            </section>
+
+            <section class="hb-test-card">
+                <h2>Runtime Status</h2>
+                <p>현재 Hb repeat crawl 상태와 polling 로그를 여기서 바로 확인합니다.</p>
+
+                <div class="hb-meta-list">
+                    <div class="hb-meta-item">
+                        <strong>Mode</strong>
+                        <div id="hbStatusMode">-</div>
+                    </div>
+                    <div class="hb-meta-item">
+                        <strong>Next Run (KST)</strong>
+                        <div id="hbStatusNextRun">-</div>
+                    </div>
+                    <div class="hb-meta-item">
+                        <strong>Inputs</strong>
+                        <div id="hbStatusInputs">-</div>
+                    </div>
+                    <div class="hb-meta-item">
+                        <strong>Last Schedule Slot</strong>
+                        <div id="hbStatusLastSlot">-</div>
+                    </div>
+                    <div class="hb-meta-item">
+                        <strong>Last Result</strong>
+                        <div id="hbStatusLastResult">-</div>
+                    </div>
+                </div>
+
+                <div id="hbLogBox" class="hb-log-box">Loading logs...</div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        let hbMinuteSlots = [];
+
+        function getKstNow() {
+            const now = new Date();
+            const utcMillis = now.getTime() + now.getTimezoneOffset() * 60000;
+            return new Date(utcMillis + 9 * 60 * 60000);
+        }
+
+        function formatKstTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            const hour = String(date.getHours()).padStart(2, "0");
+            const minute = String(date.getMinutes()).padStart(2, "0");
+            const second = String(date.getSeconds()).padStart(2, "0");
+            return `${year}-${month}-${day} ${hour}:${minute}:${second} KST`;
+        }
+
+        function normalizeSlot(slot) {
+            const value = String(slot || "").trim();
+            if (!/^\d{2}:\d{2}$/.test(value)) {
+                return null;
+            }
+            const [hour, minute] = value.split(":").map(Number);
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                return null;
+            }
+            return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+        }
+
+        function updateClock() {
+            document.getElementById("hbClockTime").textContent = formatKstTime(getKstNow());
+        }
+
+        function populateTimeSelects() {
+            const hourSelect = document.getElementById("hbHourSelect");
+            const minuteSelect = document.getElementById("hbMinuteSelect");
+
+            for (let hour = 0; hour < 24; hour += 1) {
+                const option = document.createElement("option");
+                option.value = String(hour).padStart(2, "0");
+                option.textContent = `${String(hour).padStart(2, "0")}:00`;
+                hourSelect.appendChild(option);
+            }
+
+            for (let minute = 0; minute < 60; minute += 1) {
+                const option = document.createElement("option");
+                option.value = String(minute).padStart(2, "0");
+                option.textContent = String(minute).padStart(2, "0");
+                minuteSelect.appendChild(option);
+            }
+
+            const now = getKstNow();
+            hourSelect.value = String(now.getHours()).padStart(2, "0");
+            minuteSelect.value = String((now.getMinutes() + 1) % 60).padStart(2, "0");
+        }
+
+        function renderHbSlots() {
+            const row = document.getElementById("hbSlotChipRow");
+            row.innerHTML = "";
+
+            if (!hbMinuteSlots.length) {
+                const empty = document.createElement("span");
+                empty.className = "hb-slot-chip-empty";
+                empty.textContent = "No minute slots added yet";
+                row.appendChild(empty);
+                return;
+            }
+
+            for (const slot of hbMinuteSlots) {
+                const chip = document.createElement("button");
+                chip.type = "button";
+                chip.className = "hb-slot-chip";
+                chip.innerHTML = `<span>${slot}</span><strong>&times;</strong>`;
+                chip.onclick = () => removeHbSlot(slot);
+                row.appendChild(chip);
+            }
+        }
+
+        function addHbSlot(slot) {
+            const normalized = normalizeSlot(slot);
+            if (!normalized) return;
+            if (!hbMinuteSlots.includes(normalized)) {
+                hbMinuteSlots = [...hbMinuteSlots, normalized].sort();
+                renderHbSlots();
+            }
+        }
+
+        function removeHbSlot(slot) {
+            hbMinuteSlots = hbMinuteSlots.filter((value) => value !== slot);
+            renderHbSlots();
+        }
+
+        function clearHbSlots() {
+            hbMinuteSlots = [];
+            renderHbSlots();
+        }
+
+        function addHbSlotFromSelects() {
+            const hour = document.getElementById("hbHourSelect").value;
+            const minute = document.getElementById("hbMinuteSelect").value;
+            addHbSlot(`${hour}:${minute}`);
+        }
+
+        function addQuickOffsetSlot(offsetMinutes) {
+            const next = new Date(getKstNow().getTime() + offsetMinutes * 60000);
+            addHbSlot(`${String(next.getHours()).padStart(2, "0")}:${String(next.getMinutes()).padStart(2, "0")}`);
+        }
+
+        function updateHbInputModeUI() {
+            const mode = document.getElementById("hbInputMode").value;
+            document.getElementById("hbKeywordWrap").classList.toggle("hidden", mode !== "keyword");
+            document.getElementById("hbUrlWrap").classList.toggle("hidden", mode !== "url");
+        }
+
+        function getHbKeywordInputs() {
+            return document.getElementById("hbKeywords")
+                .value
+                .split(/\r?\n/)
+                .map((value) => value.trim())
+                .filter(Boolean);
+        }
+
+        function setHbResult(message) {
+            document.getElementById("hbResultBox").textContent = message;
+        }
+
+        async function armHbMinuteTest() {
+            const inputMode = document.getElementById("hbInputMode").value;
+            const limit = Number(document.getElementById("hbLimit").value || 2);
+            const saveMode = document.getElementById("hbSaveMode").value;
+            const profileMode = document.getElementById("hbProfileMode").value;
+
+            if (!hbMinuteSlots.length) {
+                setHbResult("Add at least one minute slot before arming the test.");
+                return;
+            }
+
+            const payload = {
+                source: "tiktok",
+                input_mode: inputMode,
+                limit,
+                save_mode: saveMode,
+                profile_mode: profileMode,
+                test_schedule: {
+                    timezone: "Asia/Seoul",
+                    slots: hbMinuteSlots,
+                }
+            };
+
+            if (inputMode === "keyword") {
+                const keywords = getHbKeywordInputs();
+                if (!keywords.length) {
+                    setHbResult("Enter at least one keyword line before arming the test.");
+                    return;
+                }
+                payload.keywords = keywords;
+            } else {
+                const inputValue = document.getElementById("hbUrlInput").value.trim();
+                if (!inputValue) {
+                    setHbResult("Enter a TikTok video URL before arming the test.");
+                    return;
+                }
+                payload.input_value = inputValue;
+            }
+
+            setHbResult("Arming minute test...");
+
+            try {
+                const response = await fetch("/crawl/start", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    setHbResult(`Error: ${data.error || "failed to arm minute test"}`);
+                    return;
+                }
+
+                setHbResult(data.message || "Minute test armed.");
+                await refreshHbStatus();
+                await refreshHbLogs();
+            } catch (error) {
+                setHbResult(`Error: ${error.message}`);
+            }
+        }
+
+        async function stopHbMinuteTest() {
+            setHbResult("Stopping repeat crawl...");
+            try {
+                const response = await fetch("/crawl/stop", { method: "POST" });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    setHbResult(`Error: ${data.error || "failed to stop repeat crawl"}`);
+                    return;
+                }
+                setHbResult(data.message || "Repeat crawl stop requested.");
+                await refreshHbStatus();
+                await refreshHbLogs();
+            } catch (error) {
+                setHbResult(`Error: ${error.message}`);
+            }
+        }
+
+        async function refreshHbStatus() {
+            try {
+                const response = await fetch("/crawl/status");
+                const data = await response.json();
+                if (!data.success) return;
+
+                const activeConfig = data.active_config || {};
+                document.getElementById("hbStatusMode").textContent = data.is_running
+                    ? `${data.mode || "-"} / source=${data.source || "-"}`
+                    : "idle";
+                document.getElementById("hbStatusNextRun").textContent = data.next_run_at_kst || "-";
+                document.getElementById("hbStatusInputs").textContent = Array.isArray(activeConfig.input_values)
+                    ? activeConfig.input_values.join(", ")
+                    : "-";
+                document.getElementById("hbStatusLastSlot").textContent = data.last_schedule_slot || "-";
+
+                const lastDetails = (data.last_details || {}).tiktok || {};
+                const lastResult = [
+                    lastDetails.input_value ? `input=${lastDetails.input_value}` : null,
+                    lastDetails.trigger ? `trigger=${lastDetails.trigger}` : null,
+                    lastDetails.discovered_count != null ? `discovered=${lastDetails.discovered_count}` : null,
+                    lastDetails.saved_count != null ? `saved=${lastDetails.saved_count}` : null,
+                    lastDetails.scheduled_slot_label ? `slot=${lastDetails.scheduled_slot_label}` : null,
+                    lastDetails.scheduled_for_kst ? `scheduled_for=${lastDetails.scheduled_for_kst}` : null,
+                ].filter(Boolean).join(" / ");
+                document.getElementById("hbStatusLastResult").textContent = lastResult || "-";
+            } catch (error) {
+                console.error("Failed to refresh Hb status:", error);
+            }
+        }
+
+        async function refreshHbLogs() {
+            try {
+                const response = await fetch("/logs?show_polling=1");
+                const data = await response.json();
+                if (!data.success) return;
+                document.getElementById("hbLogBox").textContent = (data.logs || []).join("\n") || "No logs yet.";
+            } catch (error) {
+                console.error("Failed to refresh Hb logs:", error);
+            }
+        }
+
+        populateTimeSelects();
+        renderHbSlots();
+        updateHbInputModeUI();
+        updateClock();
+        refreshHbStatus();
+        refreshHbLogs();
+        setInterval(updateClock, 1000);
+        setInterval(refreshHbStatus, 5000);
+        setInterval(refreshHbLogs, 5000);
+    </script>
+</body>
+</html>

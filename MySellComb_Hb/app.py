@@ -6,12 +6,15 @@ import sys
 import threading
 from pathlib import Path
 
+from flask import render_template
+from jinja2 import ChoiceLoader, FileSystemLoader
 
 HB_ROOT = Path(__file__).resolve().parent
 LIVE_ROOT = HB_ROOT.parent
 LIVE_APP_PATH = LIVE_ROOT / "app.py"
 BROWSER_PROFILE_ROOT = HB_ROOT / "crawler" / "browser_profile"
 LIVE_APP_MODULE_NAME = "mysellcomb_live_app"
+HB_TEMPLATE_ROOT = HB_ROOT / "templates"
 
 
 def _configure_default_env() -> None:
@@ -58,6 +61,17 @@ def _load_live_app_module():
 _configure_default_env()
 LIVE_APP = _load_live_app_module()
 app = LIVE_APP.app
+app.jinja_loader = ChoiceLoader([
+    FileSystemLoader(str(HB_TEMPLATE_ROOT)),
+    app.jinja_loader,
+])
+app.config["MYSELLCOMB_IS_HB"] = True
+app.config["MYSELLCOMB_HB_TIKTOK_TEST_URL"] = "/hb/tiktok-schedule-test"
+
+
+@app.get("/hb/tiktok-schedule-test")
+def hb_tiktok_schedule_test():
+    return render_template("hb_tiktok_schedule_test.html")
 
 
 if __name__ == "__main__":
