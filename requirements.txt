@@ -1,0 +1,5 @@
+Flask>=3.0,<4.0
+playwright>=1.52,<2.0
+gspread>=6.0,<7.0
+oauth2client>=4.1,<5.0
+beautifulsoup4>=4.12,<5.0
