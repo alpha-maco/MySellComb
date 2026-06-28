@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MySellComb | Web Crawling Dashboard Portfolio</title>
+  <meta name="description" content="MySellComb is a Python, Flask, and Playwright web crawling dashboard for automated product and social data collection.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top">MySellComb</a>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#overview">Overview</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#features">Features</a>
+      <a href="#repository">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero section">
+      <div class="hero-copy">
+        <p class="eyebrow">Data Engineering Portfolio Project</p>
+        <h1>MySellComb</h1>
+        <p class="hero-text">
+          A web crawling dashboard for automated data collection across commerce and social platforms,
+          built with Python, Flask, Playwright, HTML, and CSS.
+        </p>
+        <div class="hero-actions">
+          <a class="button primary" href="#repository">View Repository</a>
+          <a class="button secondary" href="#architecture">Explore Architecture</a>
+        </div>
+      </div>
+
+      <div class="dashboard-visual" aria-label="Dashboard preview">
+        <div class="window-bar">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <div class="visual-grid">
+          <div class="metric-panel">
+            <strong>12.4K</strong>
+            <span>Collected Rows</span>
+          </div>
+          <div class="metric-panel accent-green">
+            <strong>3</strong>
+            <span>Target Sources</span>
+          </div>
+          <div class="metric-panel accent-gold">
+            <strong>24h</strong>
+            <span>Scheduled Runs</span>
+          </div>
+        </div>
+        <div class="log-preview">
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="overview" class="section content-section">
+      <div class="section-heading">
+        <p class="eyebrow">Project Overview</p>
+        <h2>Automated collection for product discovery workflows</h2>
+      </div>
+      <p>
+        MySellComb centralizes crawling tasks into a lightweight dashboard that helps collect product,
+        marketplace, and engagement data. The project focuses on repeatable data acquisition, crawl
+        monitoring, and structured outputs that can support product research and market analysis.
+      </p>
+    </section>
+
+    <section id="architecture" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Architecture</p>
+        <h2>Simple, operational, and easy to extend</h2>
+      </div>
+      <div class="architecture-flow">
+        <div class="flow-card">
+          <span class="flow-number">01</span>
+          <h3>Dashboard UI</h3>
+          <p>Runs crawls, displays status, and manages collection settings.</p>
+        </div>
+        <div class="flow-card">
+          <span class="flow-number">02</span>
+          <h3>Flask API</h3>
+          <p>Coordinates requests, schedules, crawl state, and response data.</p>
+        </div>
+        <div class="flow-card">
+          <span class="flow-number">03</span>
+          <h3>Playwright Crawlers</h3>
+          <p>Automates browser sessions for dynamic platform pages.</p>
+        </div>
+        <div class="flow-card">
+          <span class="flow-number">04</span>
+          <h3>Structured Output</h3>
+          <p>Saves normalized crawl results for review and downstream analysis.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="tech-stack" class="section split-section">
+      <div>
+        <p class="eyebrow">Tech Stack</p>
+        <h2>Built with pragmatic data tooling</h2>
+      </div>
+      <div class="stack-list">
+        <div>
+          <strong>Python</strong>
+          <span>crawler orchestration and data processing</span>
+        </div>
+        <div>
+          <strong>Flask</strong>
+          <span>dashboard server and API endpoints</span>
+        </div>
+        <div>
+          <strong>Playwright</strong>
+          <span>browser automation for dynamic pages</span>
+        </div>
+        <div>
+          <strong>HTML / CSS</strong>
+          <span>responsive dashboard interface</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Features</p>
+        <h2>Recruiter-friendly highlights</h2>
+      </div>
+      <div class="feature-grid">
+        <article>
+          <h3>Multi-source Crawling</h3>
+          <p>Designed to collect product and engagement signals from multiple web sources.</p>
+        </article>
+        <article>
+          <h3>Operational Dashboard</h3>
+          <p>Provides a browser-based interface for running crawls and reviewing collection status.</p>
+        </article>
+        <article>
+          <h3>Scheduling Support</h3>
+          <p>Supports recurring crawl workflows for consistent data collection.</p>
+        </article>
+        <article>
+          <h3>Structured Results</h3>
+          <p>Normalizes collected data into reusable records for analysis and reporting.</p>
+        </article>
+        <article>
+          <h3>Browser Automation</h3>
+          <p>Uses Playwright to handle dynamic pages where static requests are not enough.</p>
+        </article>
+        <article>
+          <h3>Portfolio-Ready Scope</h3>
+          <p>Demonstrates backend automation, frontend UI, and data engineering workflow design.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="repository" class="section repository-section">
+      <div>
+        <p class="eyebrow">GitHub Repository</p>
+        <h2>Source code and implementation details</h2>
+        <p>
+          The repository contains the crawling dashboard, Flask server, Playwright crawler modules,
+          and supporting runtime scripts for automated data collection.
+        </p>
+      </div>
+      <a class="button primary" href="https://github.com/alpha-maco/MySellComb" target="_blank" rel="noreferrer">
+        Open MySellComb on GitHub
+      </a>
+    </section>
+
+    <section id="future" class="section content-section">
+      <div class="section-heading">
+        <p class="eyebrow">Future Improvements</p>
+        <h2>Planned enhancements</h2>
+      </div>
+      <ul class="future-list">
+        <li>Add persistent storage with a relational database for crawl history.</li>
+        <li>Build monitoring alerts for blocked sessions, failed crawls, and data drift.</li>
+        <li>Introduce richer data validation and deduplication pipelines.</li>
+        <li>Expand source coverage for product discovery and promotion tracking.</li>
+        <li>Add analytics views for trend detection and product opportunity scoring.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>MySellComb</span>
+    <span>Web Crawling Dashboard for Automated Data Collection</span>
+  </footer>
+</body>
+</html>
